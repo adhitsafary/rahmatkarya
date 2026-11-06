@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blueprint & Ringkasan Solusi Aplikasi - ProCash Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-500: #64748b;
+            --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
+            --slate-200: #e2e8f0;
+            --slate-100: #f1f5f9;
+            --slate-50: #f8fafc;
+            --corporate-blue: #1e3a8a;
+            --corporate-blue-light: #2563eb;
+            --border-color: #cbd5e1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--slate-900);
+            background-color: #ffffff;
+            font-size: 8.8pt;
+            line-height: 1.45;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 12mm 14mm 12mm 14mm;
+        }
+
+        .page-container {
+            width: 100%;
+            max-width: 210mm;
+            margin: 0 auto;
+        }
+
+        .page {
+            position: relative;
+            background: #ffffff;
+            page-break-after: always;
+            break-after: page;
+            height: 273mm;
+            max-height: 273mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+
+        .page:last-child {
+            page-break-after: auto;
+            break-after: auto;
+        }
+
+        /* Formal Document Header */
+        .doc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 2px solid var(--slate-900);
+            padding-bottom: 8px;
+            margin-bottom: 14px;
+        }
+
+        .header-title-block h1 {
+            font-size: 13pt;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--slate-900);
+            line-height: 1.1;
+        }
+
+        .header-title-block p {
+            font-size: 7.5pt;
+            color: var(--slate-600);
+            font-weight: 600;
+            margin-top: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .header-meta-block {
+            text-align: right;
+            font-size: 7.2pt;
+            color: var(--slate-600);
+            line-height: 1.35;
+        }
+
+        .header-meta-block strong {
+            color: var(--slate-900);
+        }
+
+        /* Document Footer */
+        .doc-footer {
+            border-top: 1px solid var(--slate-300);
+            padding-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 7.2pt;
+            color: var(--slate-500);
+        }
+
+        /* Section Headings */
+        .section-heading {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            border-bottom: 1px solid var(--slate-300);
+            padding-bottom: 3px;
+            margin-bottom: 8px;
+            margin-top: 6px;
+        }
+
+        .section-num {
+            font-size: 9.5pt;
+            font-weight: 800;
+            color: var(--corporate-blue);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .section-title {
+            font-size: 10pt;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: var(--slate-900);
+        }
+
+        /* Executive Banner */
+        .executive-summary-box {
+            background-color: var(--slate-50);
+            border: 1px solid var(--slate-300);
+            border-left: 4px solid var(--slate-900);
+            padding: 12px 14px;
+            margin-bottom: 12px;
+        }
+
+        .executive-summary-title {
+            font-size: 9pt;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--slate-900);
+            margin-bottom: 4px;
+            letter-spacing: 0.02em;
+        }
+
+        .executive-summary-text {
+            font-size: 8.2pt;
+            color: var(--slate-700);
+            line-height: 1.45;
+        }
+
+        /* Structured Grids */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        /* Formal Content Cards */
+        .content-card {
+            background: #ffffff;
+            border: 1px solid var(--slate-200);
+            border-top: 2px solid var(--slate-700);
+            padding: 8px 10px;
+        }
+
+        .content-card-title {
+            font-size: 8.2pt;
+            font-weight: 700;
+            color: var(--slate-900);
+            margin-bottom: 3px;
+        }
+
+        .content-card-body {
+            font-size: 7.6pt;
+            color: var(--slate-600);
+            line-height: 1.35;
+        }
+
+        /* Formal KPI Metric Box */
+        .kpi-card {
+            background: var(--slate-50);
+            border: 1px solid var(--slate-300);
+            padding: 8px 10px;
+        }
+
+        .kpi-label {
+            font-size: 6.8pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--slate-600);
+        }
+
+        .kpi-value {
+            font-size: 11pt;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--slate-900);
+            margin: 2px 0;
+        }
+
+        .kpi-desc {
+            font-size: 6.8pt;
+            color: var(--slate-500);
+        }
+
+        /* Formal Tables */
+        .formal-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 7.8pt;
+            margin-bottom: 10px;
+        }
+
+        .formal-table th, .formal-table td {
+            padding: 6px 8px;
+            border: 1px solid var(--slate-300);
+            text-align: left;
+        }
+
+        .formal-table th {
+            background-color: var(--slate-100);
+            font-weight: 700;
+            color: var(--slate-900);
+            text-transform: uppercase;
+            font-size: 7pt;
+            letter-spacing: 0.04em;
+        }
+
+        .formal-table tr:nth-child(even) td {
+            background-color: var(--slate-50);
+        }
+
+        /* Status Label / Badge (Professional Minimalist) */
+        .status-tag {
+            display: inline-block;
+            padding: 1px 6px;
+            border: 1px solid var(--slate-400);
+            font-size: 6.8pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            background: #ffffff;
+            color: var(--slate-800);
+        }
+
+        /* Workflow Step (Numbered & Clean) */
+        .workflow-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 6px;
+            border: 1px solid var(--slate-200);
+            padding: 7px 10px;
+            background: #ffffff;
+        }
+
+        .workflow-num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 8.5pt;
+            font-weight: 800;
+            color: var(--slate-900);
+            width: 20px;
+            flex-shrink: 0;
+            padding-top: 1px;
+        }
+
+        .workflow-body h4 {
+            font-size: 8.2pt;
+            font-weight: 700;
+            color: var(--slate-900);
+            margin-bottom: 2px;
+        }
+
+        .workflow-body p {
+            font-size: 7.5pt;
+            color: var(--slate-600);
+            line-height: 1.35;
+        }
+
+        /* Formula Card */
+        .formula-box {
+            background: var(--slate-50);
+            border: 1px solid var(--slate-300);
+            padding: 8px 10px;
+            margin-bottom: 8px;
+        }
+
+        .formula-title {
+            font-size: 7.5pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--slate-800);
+            margin-bottom: 3px;
+        }
+
+        .formula-code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 7.8pt;
+            font-weight: 600;
+            background: #ffffff;
+            border: 1px solid var(--slate-200);
+            padding: 4px 6px;
+            color: var(--slate-900);
+            margin-bottom: 3px;
+        }
+
+        .formula-desc {
+            font-size: 7pt;
+            color: var(--slate-600);
+        }
+
+        /* Sign-off section */
+        .signoff-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid var(--slate-300);
+        }
+
+        .signoff-box {
+            font-size: 7.2pt;
+            color: var(--slate-600);
+        }
+
+        .signoff-line {
+            height: 38px;
+            border-bottom: 1px solid var(--slate-400);
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="page-container">
+
+    <!-- ================================================================= -->
+    <!-- HALAMAN 1: RINGKASAN EKSEKUTIF & VALUE PROPOSITION               -->
+    <!-- ================================================================= -->
+    <div class="page">
+        <div>
+            <!-- Formal Header -->
+            <div class="doc-header">
+                <div class="header-title-block">
+                    <h1>ProCash Tracker</h1>
+                    <p>Dokumen Spesifikasi & Ringkasan Solusi Aplikasi</p>
+                </div>
+                <div class="header-meta-block">
+                    <div><strong>Klasifikasi:</strong> Dokumen Klien & Mitra</div>
+                    <div><strong>Versi Dokumen:</strong> 1.0 (Edisi Eksekutif)</div>
+                    <div><strong>Tanggal:</strong> November 2026</div>
+                </div>
+            </div>
+
+            <!-- Executive Summary -->
+            <div class="executive-summary-box">
+                <div class="executive-summary-title">Ringkasan Eksekutif (Executive Summary)</div>
+                <div class="executive-summary-text">
+                    ProCash Tracker adalah sistem informasi berbasis web yang dikembangkan secara spesifik untuk mengelola perputaran arus kas proyek, pencatatan termin pembayaran masuk, akuntabilitas alokasi honor tim pendukung, serta verifikasi posisi likuiditas kas secara riil. Aplikasi ini bertindak sebagai pusat kendali finansial guna mencegah risiko gagal tagih (piutang mengendap), menghilangkan potensi defisit akibat penggunaan dana sebelum hak tim terselesaikan, serta menyediakan dokumentasi transaksi yang transparan bagi pemilik proyek, manajemen, dan pemangku kepentingan.
+                </div>
+            </div>
+
+            <!-- 1.0 Latar Belakang & Identifikasi Masalah -->
+            <div class="section-heading">
+                <span class="section-num">1.0</span>
+                <span class="section-title">Latar Belakang & Tantangan Pengelolaan Finansial</span>
+            </div>
+
+            <p style="font-size: 7.8pt; color: var(--slate-700); line-height: 1.45; margin-bottom: 8px;">
+                Dalam pengerjaan proyek berskala institusional maupun profesional, arus pembayaran dari klien umumnya disalurkan dalam beberapa tahapan termin (misalnya pembayaran uang muka, termin progres pengerjaan, dan pelunasan serah terima). Di saat yang bersamaan, pelaksanaan proyek melibatkan pihak ketiga atau tim pelaksana (seperti teknisi, pengembang sistem, dan konsultan) yang memiliki hak pembayaran bertahap. Pengelolaan berbasis catatan manual atau spreadsheet konvensional kerap menimbulkan kelemahan struktural: ketidakjelasan jumlah saldo kas yang aman untuk dibelanjakan, keterlambatan dalam penagihan sisa kontrak ke klien, serta potensi perselisihan atas sisa kewajiban honor pelaksana.
+            </p>
+
+            <!-- 2.0 Empat Pilar Nilai Bisnis -->
+            <div class="section-heading">
+                <span class="section-num">2.0</span>
+                <span class="section-title">Empat Pilar Nilai Bisnis Utama</span>
+            </div>
+
+            <div class="grid-2">
+                <div class="content-card">
+                    <div class="content-card-title">2.1 Kepastian Saldo Kas Riil (True Safe Cash)</div>
+                    <div class="content-card-body">
+                        Sistem memisahkan secara tegas antara dana masuk bruto dengan kewajiban kontraktual tim. Pengguna memperoleh visibilitas instan atas dana riil yang berhak dicairkan tanpa mengganggu plafon pembayaran tim.
+                    </div>
+                </div>
+
+                <div class="content-card">
+                    <div class="content-card-title">2.2 Mitigasi Piutang Mengendap (Zero Unbilled Debt)</div>
+                    <div class="content-card-body">
+                        Setiap sisa termin kontrak yang belum terealisasi dipantau secara otomatis oleh indikator sistem. Penagihan termin didukung oleh modul komunikasi pengingat terstruktur untuk memastikan perputaran modal kerja tetap lancar.
+                    </div>
+                </div>
+
+                <div class="content-card">
+                    <div class="content-card-title">2.3 Akuntabilitas Komitmen Rekanan (Team Liability)</div>
+                    <div class="content-card-body">
+                        Pencatatan komitmen honor dan riwayat cicilan ke setiap anggota pelaksana terdokumentasi rapi dalam buku kas individual, mencegah kelebihan pembayaran atau ketidaksesuaian nilai kesepakatan awal.
+                    </div>
+                </div>
+
+                <div class="content-card">
+                    <div class="content-card-title">2.4 Dokumentasi Transaksi Standar Audit</div>
+                    <div class="content-card-body">
+                        Setiap proyek memiliki lembar rekapitulasi finansial yang dapat diekspor langsung ke format PDF standar industri, memuat riwayat pembayaran klien, pencairan biaya operasional, dan lembar verifikasi sah.
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3.0 Metrik Finansial Otomatis -->
+            <div class="section-heading">
+                <span class="section-num">3.0</span>
+                <span class="section-title">Metrik Finansial Terkalkulasi Otomatis</span>
+            </div>
+
+            <div class="grid-4">
+                <div class="kpi-card">
+                    <div class="kpi-label">Kas Bersih Riil</div>
+                    <div class="kpi-value">Rp 1.750.000</div>
+                    <div class="kpi-desc">Dana likuid aman di tangan</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Sisa Piutang Klien</div>
+                    <div class="kpi-value">Rp 8.250.000</div>
+                    <div class="kpi-desc">Tagihan termin aktif</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Kewajiban Hak Tim</div>
+                    <div class="kpi-value">Rp 2.000.000</div>
+                    <div class="kpi-desc">Komitmen honor tertunda</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Proyeksi Margin</div>
+                    <div class="kpi-value">72.7%</div>
+                    <div class="kpi-desc">Estimasi laba bersih kontrak</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="doc-footer">
+            <span>ProCash Tracker &bull; Dokumen Spesifikasi & Ringkasan Solusi</span>
+            <span>Halaman 1 dari 4</span>
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- HALAMAN 2: FITUR FUNGSIONAL & ANALISIS EFISIENSI                 -->
+    <!-- ================================================================= -->
+    <div class="page">
+        <div>
+            <!-- Formal Header -->
+            <div class="doc-header">
+                <div class="header-title-block">
+                    <h1>ProCash Tracker</h1>
+                    <p>Komparasi Pengelolaan & Modul Fungsional Utama</p>
+                </div>
+                <div class="header-meta-block">
+                    <div><strong>Ref:</strong> PCT-MOD-02</div>
+                    <div><strong>Distribusi:</strong> Klien / Pengguna Internal</div>
+                </div>
+            </div>
+
+            <!-- 4.0 Komparasi Sistem -->
+            <div class="section-heading">
+                <span class="section-num">4.0</span>
+                <span class="section-title">Analisis Efisiensi: Metode Konvensional vs ProCash Tracker</span>
+            </div>
+
+            <table class="formal-table">
+                <thead>
+                    <tr>
+                        <th style="width: 25%;">Area Evaluasi</th>
+                        <th style="width: 37%;">Metode Konvensional (Spreadsheet / Buku Kas)</th>
+                        <th style="width: 38%;">Implementasi ProCash Tracker</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Perhitungan Saldo Kas Riil</strong></td>
+                        <td>Perhitungan manual rentan kesalahan rumus; dana komitmen pihak ketiga sering terpakai untuk pos lain.</td>
+                        <td>Sistem otomatis mengagregasi pemasukan termin dan langsung memotong komitmen biaya tim secara real-time.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pengawasan Piutang Termin</strong></td>
+                        <td>Bergantung pada peninjauan berkala manual; risiko termin terlewat setelah masa pengerjaan selesai.</td>
+                        <td>Status piutang teridentifikasi secara visual; alert langsung aktif selama saldo kontrak belum mencapai 100%.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Komunikasi Penagihan</strong></td>
+                        <td>Penyusunan format penagihan manual; sering tertunda akibat hambatan administrasi pengetikan rincian.</td>
+                        <td>Integrasi template penagihan terstandarisasi berbasis satu klik dengan parameter nominal dan nomor kontrak presisi.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pencatatan Beban Pelaksana</strong></td>
+                        <td>Riwayat transfer tersebar di arsip perbankan tanpa sinkronisasi langsung ke proyek bersangkutan.</td>
+                        <td>Buku besar digital per pelaksana memuat plafon disepakati, tanggal pencairan, serta sisa tanggungan terbuka.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Penyusunan Laporan Proyek</strong></td>
+                        <td>Membutuhkan kompilasi ulang format cetak (30-60 menit per proyek) untuk pertanggungjawaban.</td>
+                        <td>Penerbitan dokumen rekapitulasi format PDF resmi instan, lengkap dengan struktur tabel standar korporasi.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- 5.0 Struktur Data Proyek Percontohan -->
+            <div class="section-heading">
+                <span class="section-num">5.0</span>
+                <span class="section-title">Struktur Data Finansial Proyek (Contoh Kasus Operasional)</span>
+            </div>
+
+            <div style="border: 1px solid var(--slate-300); padding: 8px 10px; background: var(--slate-50); margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--slate-300); padding-bottom: 4px; margin-bottom: 6px;">
+                    <div style="font-size: 8.5pt; font-weight: 700; color: var(--slate-900);">
+                        Identitas Proyek: Pengembangan Portal E-Commerce Terpadu (Klien: PT Mitra Perkasa)
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        <span class="status-tag">Status Piutang: Aktif</span>
+                        <span class="status-tag">Status Tim: Berjalan</span>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 7.5pt;">
+                    <div>
+                        <div style="color: var(--slate-500); font-size: 6.8pt; text-transform: uppercase;">Total Nilai Kontrak</div>
+                        <div style="font-weight: 700; font-family: 'JetBrains Mono', monospace;">Rp 11.000.000</div>
+                    </div>
+                    <div>
+                        <div style="color: var(--slate-500); font-size: 6.8pt; text-transform: uppercase;">Realisasi Pembayaran Klien</div>
+                        <div style="font-weight: 700; font-family: 'JetBrains Mono', monospace;">Rp 2.750.000 (Termin DP)</div>
+                    </div>
+                    <div>
+                        <div style="color: var(--slate-500); font-size: 6.8pt; text-transform: uppercase;">Realisasi Honor Terbayar</div>
+                        <div style="font-weight: 700; font-family: 'JetBrains Mono', monospace;">Rp 1.000.000</div>
+                    </div>
+                    <div>
+                        <div style="color: var(--slate-500); font-size: 6.8pt; text-transform: uppercase;">Posisi Kas Riil di Tangan</div>
+                        <div style="font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--corporate-blue);">Rp 1.750.000</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6.0 Enam Modul Fungsional Utama -->
+            <div class="section-heading">
+                <span class="section-num">6.0</span>
+                <span class="section-title">Enam Modul Fungsional Aplikasi</span>
+            </div>
+
+            <div class="grid-3">
+                <div class="content-card">
+                    <div class="content-card-title">6.1 Dashboard Finansial Eksekutif</div>
+                    <div class="content-card-body">Menampilkan konsolidasi portofolio proyek: total kas bersih aman, total piutang berjalan, dan rasio margin.</div>
+                </div>
+
+                <div class="content-card">
+                    <div class="content-card-title">6.2 Pengelolaan Multi-Termin</div>
+                    <div class="content-card-body">Mendukung struktur termin bertahap tanpa batas (Uang Muka, Termin Pengerjaan, Pelunasan) dengan log audit tanggal.</div>
+                </div>
+
+                <div class="content-card">
+                    <div class="content-card-title">6.3 Ledger Honor Pelaksana</div>
+                    <div class="content-card-body">Pencatatan alokasi plafon biaya per individu beserta riwayat pencairan cicilan honor secara transparan.</div>
+                </div>
+
+                <div class="content-card">
+                    <div class="content-card-title">6.4 Indikator Status Finansial</div>
+                    <div class="content-card-body">Penanda status operasional terotomasi: Perlu Ditagih (Piutang &gt; 0), Tanggungan Tim (Hutang Tim &gt; 0), dan Selesai (Lunas).</div>
+                </div>
+
+                <div class="content-card">
+                    <div class="content-card-title">6.5 Otomasi Notifikasi WhatsApp</div>
+                    <div class="content-card-body">Penerbitan draf komunikasi penagihan formal ke kontak penanggung jawab klien dengan parameter kontrak terisi otomatis.</div>
+                </div>
+
+                <div class="content-card">
+                    <div class="content-card-title">6.6 Pelaporan Format PDF Resmi</div>
+                    <div class="content-card-body">Penerbitan berkas rekapitulasi finansial proyek berstandar cetak formal untuk keperluan pertanggungjawaban klien dan audit.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="doc-footer">
+            <span>ProCash Tracker &bull; Dokumen Spesifikasi & Ringkasan Solusi</span>
+            <span>Halaman 2 dari 4</span>
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- HALAMAN 3: BLUEPRINT ALUR KERJA (WORKFLOW & LOGIKA BISNIS)       -->
+    <!-- ================================================================= -->
+    <div class="page">
+        <div>
+            <!-- Formal Header -->
+            <div class="doc-header">
+                <div class="header-title-block">
+                    <h1>ProCash Tracker</h1>
+                    <p>Blueprint Alur Operasional & Formulasi Perhitungan</p>
+                </div>
+                <div class="header-meta-block">
+                    <div><strong>Ref:</strong> PCT-SOP-03</div>
+                    <div><strong>Standar:</strong> Standard Operating Procedure</div>
+                </div>
+            </div>
+
+            <!-- 7.0 Alur Operasional End-to-End -->
+            <div class="section-heading">
+                <span class="section-num">7.0</span>
+                <span class="section-title">Siklus Operasional Finansial Proyek (End-to-End SOP)</span>
+            </div>
+
+            <div class="workflow-row">
+                <div class="workflow-num">01</div>
+                <div class="workflow-body">
+                    <h4>Inisiasi Master Proyek & Nilai Kontrak</h4>
+                    <p>Pendaftaran identitas proyek ke dalam sistem, mencakup nama proyek, nama instansi klien, kontak resmi penanggung jawab, nilai kontrak yang disepakati, serta target tanggal penyelesaian (deadline).</p>
+                </div>
+            </div>
+
+            <div class="workflow-row">
+                <div class="workflow-num">02</div>
+                <div class="workflow-body">
+                    <h4>Penetapan Alokasi & Komitmen Plafon Tim</h4>
+                    <p>Pendaftaran personel atau subkontraktor pendukung beserta plafon biaya yang disepakati. Sistem secara otomatis mengunci nilai komitmen ini sebagai pos kewajiban yang mengurangi proyeksi laba bersih.</p>
+                </div>
+            </div>
+
+            <div class="workflow-row">
+                <div class="workflow-num">03</div>
+                <div class="workflow-body">
+                    <h4>Pencatatan Penerimaan Termin Klien</h4>
+                    <p>Setiap penerimaan pembayaran (Uang Muka atau termin progres) dicatatkan dengan tanggal, metode transfer, dan bukti referensi. Sistem memperbarui saldo piutang secara seketika tanpa kalkulasi manual.</p>
+                </div>
+            </div>
+
+            <div class="workflow-row">
+                <div class="workflow-num">04</div>
+                <div class="workflow-body">
+                    <h4>Realisasi Pencairan Honor & Kontrol Likuiditas Kas</h4>
+                    <p>Pencairan honor kepada tim dicatatkan ke dalam ledger individual. Sistem secara otomatis memperbarui indikator kas riil, memastikan saldo kas di tangan merefleksikan likuiditas yang bebas dari klaim pihak ketiga.</p>
+                </div>
+            </div>
+
+            <div class="workflow-row">
+                <div class="workflow-num">05</div>
+                <div class="workflow-body">
+                    <h4>Pengawasan Indikator & Komunikasi Penagihan</h4>
+                    <p>Bila sisa piutang klien terdeteksi aktif saat progres pekerjaan mencapai tahapan jatuh tempo, sistem mengaktifkan tombol notifikasi penagihan cepat guna menghasilkan draf pesan formal yang siap dikirim.</p>
+                </div>
+            </div>
+
+            <div class="workflow-row">
+                <div class="workflow-num">06</div>
+                <div class="workflow-body">
+                    <h4>Rekonsiliasi Akhir, Status Selesai, & Penerbitan Laporan PDF</h4>
+                    <p>Setelah seluruh termin klien diterima penuh dan kewajiban kepada tim diselesaikan tuntas, status proyek beralih menjadi Lunas Selesai. Pengguna mencetak lembar rekapitulasi PDF resmi sebagai penutupan berkas.</p>
+                </div>
+            </div>
+
+            <!-- 8.0 Formulasi Finansial Baku -->
+            <div class="section-heading" style="margin-top: 10px;">
+                <span class="section-num">8.0</span>
+                <span class="section-title">Formulasi Baku Perhitungan Finansial</span>
+            </div>
+
+            <div class="grid-2">
+                <div class="formula-box">
+                    <div class="formula-title">8.1 Formula Kas Bersih Riil (Safe Cash)</div>
+                    <div class="formula-code">Kas Bersih = Total Pemasukan Klien - Total Pengeluaran Tim</div>
+                    <div class="formula-desc">
+                        Menjamin agar pengguna tidak membelanjakan modal kerja yang secara yuridis merupakan hak komitmen personel pelaksana proyek.
+                    </div>
+                </div>
+
+                <div class="formula-box">
+                    <div class="formula-title">8.2 Formula Sisa Piutang Usaha (Unbilled Contract)</div>
+                    <div class="formula-code">Piutang = Nilai Total Kontrak - Total Pemasukan Klien</div>
+                    <div class="formula-desc">
+                        Mengukur jumlah nominal hak penagihan yang masih tertahan di pihak klien hingga tahap serah terima pekerjaan selesai.
+                    </div>
+                </div>
+
+                <div class="formula-box">
+                    <div class="formula-title">8.3 Formula Proyeksi Laba Bersih (Net Profit)</div>
+                    <div class="formula-code">Proyeksi Laba = Nilai Kontrak - Total Plafon Biaya Tim</div>
+                    <div class="formula-desc">
+                        Menetapkan kepastian margin keuntungan yang akan diterima pemilik proyek setelah seluruh komitmen biaya diselesaikan.
+                    </div>
+                </div>
+
+                <div class="formula-box">
+                    <div class="formula-title">8.4 Formula Margin Keuntungan (%)</div>
+                    <div class="formula-code">Margin (%) = (Proyeksi Laba / Nilai Kontrak) x 100%</div>
+                    <div class="formula-desc">
+                        Menjadi indikator kinerja komparatif untuk mengevaluasi profitabilitas portofolio proyek antar periode berjalan.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="doc-footer">
+            <span>ProCash Tracker &bull; Dokumen Spesifikasi & Ringkasan Solusi</span>
+            <span>Halaman 3 dari 4</span>
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- HALAMAN 4: TATA KELOLA AKSES, KEAMANAN & PENGESAHAN              -->
+    <!-- ================================================================= -->
+    <div class="page">
+        <div>
+            <!-- Formal Header -->
+            <div class="doc-header">
+                <div class="header-title-block">
+                    <h1>ProCash Tracker</h1>
+                    <p>Tata Kelola Keamanan, Hak Akses & Spesifikasi Teknis</p>
+                </div>
+                <div class="header-meta-block">
+                    <div><strong>Ref:</strong> PCT-SEC-04</div>
+                    <div><strong>Standar:</strong> Enterprise Governance</div>
+                </div>
+            </div>
+
+            <!-- 9.0 Matriks Tata Kelola Hak Akses -->
+            <div class="section-heading">
+                <span class="section-num">9.0</span>
+                <span class="section-title">Matriks Pengendalian Hak Akses (Role-Based Access Control)</span>
+            </div>
+
+            <table class="formal-table">
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Peran Pengguna</th>
+                        <th style="width: 50%;">Wewenang Fungsional</th>
+                        <th style="width: 30%;">Batasan Akses</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Super Administrator</strong></td>
+                        <td>Otoritas penuh konfigurasi sistem, penambahan/penghapusan proyek, manajemen pengguna, dan penerbitan laporan.</td>
+                        <td>Akses terbatas hanya kepada penanggung jawab utama.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Operator / Editor</strong></td>
+                        <td>Pencatatan transaksi termin klien, pencatatan pembayaran honor tim, dan pembaruan progres operasional.</td>
+                        <td>Tidak memiliki otorisasi menghapus master data atau memodifikasi pengguna.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Auditor / Viewer</strong></td>
+                        <td>Peninjauan status proyek, pembacaan ringkasan metrik kas, dan verifikasi lembar rekapitulasi.</td>
+                        <td>Hak baca saja (Read-Only), tidak dapat melakukan manipulasi data finansial.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- 10.0 Arsitektur & Keamanan Data -->
+            <div class="section-heading">
+                <span class="section-num">10.0</span>
+                <span class="section-title">Spesifikasi Arsitektur & Keamanan Data</span>
+            </div>
+
+            <div class="grid-2">
+                <div class="content-card">
+                    <div class="content-card-title">10.1 Integritas Transaksi Database</div>
+                    <div class="content-card-body">
+                        Sistem mengimplementasikan kueri terparameter (PDO Prepared Statements) guna mengeliminasi kerentanan SQL Injection, didukung relasi foreign keys dengan integritas referensial ketat.
+                    </div>
+                </div>
+
+                <div class="content-card">
+                    <div class="content-card-title">10.2 Kriptografi & Manajemen Sesi</div>
+                    <div class="content-card-body">
+                        Kredensial pengguna dilindungi melalui algoritma hashing satu arah berstandar industri (Bcrypt), disertai pengelolaan sesi terisolasi untuk mencegah pembajakan otentikasi.
+                    </div>
+                </div>
+            </div>
+
+            <!-- 11.0 Tanya Jawab Terstruktur (FAQ) -->
+            <div class="section-heading">
+                <span class="section-num">11.0</span>
+                <span class="section-title">Tanya Jawab Terstruktur Bagi Customer (FAQ)</span>
+            </div>
+
+            <div style="font-size: 7.8pt; line-height: 1.45; margin-bottom: 12px;">
+                <div style="margin-bottom: 7px; border-bottom: 1px dashed var(--slate-200); padding-bottom: 5px;">
+                    <strong>Q1: Apakah data finansial proyek dapat diekspor untuk audit independen?</strong><br>
+                    <span style="color: var(--slate-600);">A1: Ya. Seluruh data proyek dapat diekspor dalam format dokumen PDF standar cetak atau dikonversi ke format tabular untuk keperluan analisis pembukuan eksternal.</span>
+                </div>
+                <div style="margin-bottom: 7px; border-bottom: 1px dashed var(--slate-200); padding-bottom: 5px;">
+                    <strong>Q2: Apakah sistem mendukung skema termin pengerjaan bersyarat non-standar?</strong><br>
+                    <span style="color: var(--slate-600);">A2: Ya. Skema pembayaran klien maupun alokasi tim bersifat dinamis, mengakomodasi jumlah termin yang tidak terbatas sesuai kesepakatan kontrak kerja.</span>
+                </div>
+                <div style="margin-bottom: 7px; border-bottom: 1px dashed var(--slate-200); padding-bottom: 5px;">
+                    <strong>Q3: Bagaimana fleksibilitas penerapan infrastruktur ProCash Tracker?</strong><br>
+                    <span style="color: var(--slate-600);">A3: Aplikasi dapat dioperasikan secara lokal (on-premise Intranet) maupun ditempatkan pada infrastruktur Cloud Hosting / Private Server sesuai standar tata kelola instansi pengguna.</span>
+                </div>
+                <div style="margin-bottom: 7px; border-bottom: 1px dashed var(--slate-200); padding-bottom: 5px;">
+                    <strong>Q4: Apakah sistem dapat diakses secara simultan oleh multi-pengguna?</strong><br>
+                    <span style="color: var(--slate-600);">A4: Ya. Sistem dirancang multi-user dengan manajemen sesi terisolasi, sehingga tim administrasi operasional dan manajemen eksekutif dapat memantau data terkini secara bersamaan.</span>
+                </div>
+                <div>
+                    <strong>Q5: Bagaimana mekanisme pencadangan (backup) dan pemulihan data keuangan?</strong><br>
+                    <span style="color: var(--slate-600);">A5: Basis data mendukung pencadangan berkala secara terstruktur (SQL dump) yang dapat diarsipkan secara otomatis untuk menjamin kontinuitas operasional data jangka panjang.</span>
+                </div>
+            </div>
+
+            <div style="background: var(--slate-50); border: 1px solid var(--slate-300); border-left: 3px solid var(--slate-700); padding: 8px 12px; font-size: 7.4pt; color: var(--slate-600); line-height: 1.4;">
+                <strong>Catatan Tata Kelola Sistem:</strong> Dokumen spesifikasi dan blueprint ini diterbitkan sebagai representasi fungsional resmi ProCash Tracker. Seluruh mekanisme pencatatan, kalkulasi otomatis, dan pengelolaan kas beroperasi sesuai prinsip kehati-hatian finansial serta standar tata kelola data yang berlaku.
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="doc-footer">
+            <span>ProCash Tracker &bull; Dokumen Spesifikasi & Ringkasan Solusi</span>
+            <span>Halaman 4 dari 4 &bull; Dokumen Selesai</span>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

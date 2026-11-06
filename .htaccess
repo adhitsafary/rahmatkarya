@@ -1,0 +1,23 @@
+<IfModule mod_dir.c>
+  DirectoryIndex index.html index.php
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /ASLI/Projectk2/
+
+  # Allow direct access to backend PHP scripts
+  RewriteRule \.php$ - [L]
+
+  # Allow direct access to panel subfolder
+  RewriteRule ^panel/ - [L]
+
+  # Don't rewrite existing files or directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Fallback all other requests to index.html for SPA
+  RewriteRule ^index\.html$ - [L]
+  RewriteRule . index.html [L]
+</IfModule>
