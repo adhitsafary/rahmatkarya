@@ -98,7 +98,7 @@ export default function FilamentSidebar({
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         
-        {/* Brand Header: Clean Minimalist ProCash */}
+        {/* Brand Header: Clean Minimalist Rahmat-Karya */}
         {collapsed ? (
           <div className="h-16 flex items-center justify-center border-b border-slate-100 dark:border-slate-800">
             <button
@@ -106,7 +106,7 @@ export default function FilamentSidebar({
               className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs flex items-center justify-center shadow-xs hover:opacity-90 transition"
               title="Perluas Sidebar"
             >
-              PC
+              RK
             </button>
           </div>
         ) : (
@@ -116,12 +116,12 @@ export default function FilamentSidebar({
               onClick={() => onSelectTab('dashboard')}
             >
               <div className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs flex items-center justify-center shadow-xs shrink-0 tracking-tight">
-                PC
+                RK
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white truncate">
-                    ProCash
+                    Rahmat-Karya
                   </h1>
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     ADMIN

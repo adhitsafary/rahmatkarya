@@ -706,7 +706,7 @@ try {
             $portalUrl = "http://{$host}/ASLI/Projectk2/client.php?token={$project['client_access_token']}";
 
             $waText = "Halo Bpk/Ibu *{$project['client_name']}*,\n\n"
-                    . "Berikut ringkasan update proyek Anda di ProCash:\n"
+                    . "Berikut ringkasan update proyek Anda di Rahmat-Karya:\n"
                     . "• *Nama Proyek:* {$project['project_name']}\n"
                     . "• *No. Kontrak:* " . ($project['contract_number'] ?: $project['project_code']) . "\n"
                     . "• *Total Tagihan:* Rp " . number_format($project['total_contract_value'], 0, ',', '.') . "\n"

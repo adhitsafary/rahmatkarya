@@ -32,11 +32,11 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
       {/* Top Bar with Dark Mode Toggle */}
       <div className="max-w-md w-full mx-auto flex justify-between items-center py-2">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white font-black text-xs shadow-xs">
-            RC
+          <div className="w-8 h-8 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center font-bold text-xs shadow-xs">
+            RK
           </div>
-          <span className="text-xs font-black text-slate-800 dark:text-white tracking-tight">
-            KAS PROYEK
+          <span className="text-xs font-bold text-slate-800 dark:text-white tracking-tight">
+            RAHMAT-KARYA
           </span>
         </div>
 

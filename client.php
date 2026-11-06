@@ -21,7 +21,7 @@ $currentUser = getCurrentUser();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dashboard Klien - ProCash Portal</title>
+    <title>Dashboard Klien - Rahmat-Karya</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -104,10 +104,10 @@ $currentUser = getCurrentUser();
                 <div class="h-16 px-5 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 shrink-0">
                     <div class="flex items-center gap-3">
                         <div class="w-8 h-8 rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center font-black text-xs">
-                            PC
+                            RK
                         </div>
                         <div>
-                            <span class="font-bold text-sm text-slate-900 dark:text-white tracking-tight">ProCash</span>
+                            <span class="font-bold text-sm text-slate-900 dark:text-white tracking-tight">Rahmat-Karya</span>
                             <span class="text-[10px] text-slate-400 block font-medium">Portal Klien</span>
                         </div>
                     </div>
@@ -615,7 +615,7 @@ $currentUser = getCurrentUser();
                                     <h4 class="text-xs font-bold text-slate-900 dark:text-white">Ada Pertanyaan atau Kendala?</h4>
                                     <p class="text-[11px] text-slate-400">Tim kami siap membantu Anda kapan saja</p>
                                 </div>
-                                <a :href="'https://wa.me/6281234567890?text=' + encodeURIComponent('Halo Tim ProCash, saya ingin bertanya terkait proyek ' + (project.project_name || ''))" target="_blank"
+                                <a :href="'https://wa.me/6281234567890?text=' + encodeURIComponent('Halo Tim Rahmat-Karya, saya ingin bertanya terkait proyek ' + (project.project_name || ''))" target="_blank"
                                    class="w-full py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center justify-center gap-2 transition">
                                     <span>Hubungi Tim via WhatsApp</span>
                                 </a>

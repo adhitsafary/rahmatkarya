@@ -132,10 +132,8 @@ export default function App() {
       setActiveTab('receivables');
     } else if (filterId === 'need_payout') {
       setActiveTab('team');
-    } else if (filterId === 'all') {
-      if (activeTab === 'receivables' || activeTab === 'team') {
-        setActiveTab('projects');
-      }
+    } else if (filterId === 'all' || filterId === 'settled') {
+      setActiveTab('projects');
     }
   };
 
@@ -330,8 +328,12 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Filament Stats Overview Widget */}
-              <FilamentStatsOverview summary={summary} />
+              {/* Filament Stats Overview Widget: Adaptif sesuai menu aktif (Daftar Proyek, Piutang, Honor Tim, Ringkasan Kas) */}
+              <FilamentStatsOverview 
+                summary={summary} 
+                projects={projects} 
+                activeTab={activeTab} 
+              />
 
               {/* Filament Table Builder */}
               <FilamentTable

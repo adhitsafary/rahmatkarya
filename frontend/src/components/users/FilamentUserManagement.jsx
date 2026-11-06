@@ -405,7 +405,7 @@ export default function FilamentUserManagement({ currentUser, showToast }) {
                   required
                   value={formCreate.email}
                   onChange={(e) => setFormCreate({ ...formCreate, email: e.target.value })}
-                  placeholder="siti@procash.local"
+                  placeholder="siti@rahmatkarya.local"
                   className="w-full rounded-xl px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono"
                 />
               </div>
