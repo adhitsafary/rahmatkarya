@@ -28,9 +28,10 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // App Theme: 100% synchronized with 'procash_dark'
+  // App Theme: Default to Dark Ops/NOC Console, synchronized with 'procash_dark'
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    return localStorage.getItem('procash_dark') === 'true';
+    const saved = localStorage.getItem('procash_dark');
+    return saved !== null ? saved === 'true' : true;
   });
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -235,7 +236,7 @@ export default function App() {
 
   // 3. Authenticated -> Full Filament 3 Admin Panel
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors antialiased selection:bg-amber-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#060D1A] text-slate-800 dark:text-slate-100 transition-colors antialiased selection:bg-blue-600 selection:text-white">
       
       {/* Toast Notification */}
       <FilamentNotification toast={toast} onClose={() => setToast({ ...toast, show: false })} />
