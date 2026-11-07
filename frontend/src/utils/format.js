@@ -7,6 +7,20 @@ export function formatRupiah(amount) {
   return 'Rp ' + num.toLocaleString('id-ID');
 }
 
+// Format numbers with Indonesian thousands dots as user types: "15000000" -> "15.000.000"
+export function formatNumberWithDots(val) {
+  if (val === undefined || val === null || val === '') return '';
+  const clean = val.toString().replace(/\D/g, '');
+  if (!clean) return '';
+  return clean.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+// Parse dotted string back into raw digits for backend APIs: "15.000.000" -> "15000000"
+export function parseNumberFromDots(val) {
+  if (val === undefined || val === null || val === '') return '';
+  return val.toString().replace(/\D/g, '');
+}
+
 export function formatDate(dateStr) {
   if (!dateStr) return '-';
   const d = new Date(dateStr);

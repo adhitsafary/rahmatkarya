@@ -201,4 +201,37 @@ INSERT INTO `team_payments` (`id`, `project_team_member_id`, `amount_paid`, `pay
 (2, 3, '750000.00', '2026-10-19', 'TRANSFER', 'Honor Tahap 1'),
 (3, 4, '9000000.00', '2026-10-28', 'TRANSFER', 'Pelunasan Honor & Material Kafe Senja');
 
+-- Table app_settings
+CREATE TABLE IF NOT EXISTS `app_settings` (
+  `key_name` VARCHAR(100) NOT NULL PRIMARY KEY,
+  `key_value` TEXT NULL,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Table ai_chat_sessions (Sesi Percakapan Asisten AI Gemini)
+CREATE TABLE IF NOT EXISTS `ai_chat_sessions` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `session_id` VARCHAR(64) NOT NULL UNIQUE,
+  `user_id` INT UNSIGNED NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_session_user` (`user_id`),
+  INDEX `idx_session_updated` (`updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Table ai_chat_messages (Riwayat Percakapan Asisten AI Gemini)
+CREATE TABLE IF NOT EXISTS `ai_chat_messages` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT UNSIGNED NULL,
+  `session_id` VARCHAR(64) NULL,
+  `role` ENUM('user', 'model') NOT NULL,
+  `message` LONGTEXT NOT NULL,
+  `model` VARCHAR(50) NULL DEFAULT 'gemini-1.5-flash',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_chat_user` (`user_id`),
+  INDEX `idx_chat_session` (`session_id`),
+  INDEX `idx_chat_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

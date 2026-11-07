@@ -19,7 +19,7 @@ if (!$isClientAction) {
 }
 
 $pdo = Database::getConnection();
-$method = $_SERVER['REQUEST_METHOD'];
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 // Helper to read JSON request body or POST params
 function getRequestData() {
@@ -136,6 +136,77 @@ try {
             break;
 
         // -------------------------------------------------------------
+        // 2b. All Team Members & Subkon List with Remaining Honor
+        // -------------------------------------------------------------
+        case 'team_members':
+            $projectId = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
+            $filter = trim($_GET['filter'] ?? 'all'); // 'all', 'unpaid', 'paid'
+            $search = trim($_GET['search'] ?? '');
+
+            $sql = "
+                SELECT 
+                    ptm.id,
+                    ptm.project_id,
+                    ptm.member_name,
+                    ptm.member_role,
+                    ptm.member_phone,
+                    ptm.bank_account_info,
+                    ptm.agreed_honor,
+                    ptm.created_at,
+                    p.project_name,
+                    p.project_code,
+                    p.contract_number,
+                    p.client_name,
+                    p.status AS project_status,
+                    COALESCE(SUM(tp.amount_paid), 0) AS total_paid,
+                    (ptm.agreed_honor - COALESCE(SUM(tp.amount_paid), 0)) AS remaining_honor
+                FROM project_team_members ptm
+                JOIN projects p ON p.id = ptm.project_id
+                LEFT JOIN team_payments tp ON tp.project_team_member_id = ptm.id
+                WHERE 1=1
+            ";
+            $params = [];
+
+            if ($projectId > 0) {
+                $sql .= " AND ptm.project_id = ?";
+                $params[] = $projectId;
+            }
+
+            if (!empty($search)) {
+                $sql .= " AND (ptm.member_name LIKE ? OR ptm.member_role LIKE ? OR p.project_name LIKE ? OR p.client_name LIKE ? OR ptm.member_phone LIKE ?)";
+                $sTerm = "%{$search}%";
+                $params[] = $sTerm;
+                $params[] = $sTerm;
+                $params[] = $sTerm;
+                $params[] = $sTerm;
+                $params[] = $sTerm;
+            }
+
+            $sql .= " GROUP BY ptm.id ";
+
+            if ($filter === 'unpaid' || $filter === 'yellow' || $filter === 'need_payout') {
+                $sql .= " HAVING remaining_honor > 0 ";
+            } elseif ($filter === 'paid' || $filter === 'settled' || $filter === 'lunas') {
+                $sql .= " HAVING remaining_honor <= 0 ";
+            }
+
+            $sql .= " ORDER BY remaining_honor DESC, ptm.id DESC ";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Fetch payment history for each member
+            foreach ($members as &$m) {
+                $stmtHistory = $pdo->prepare("SELECT * FROM team_payments WHERE project_team_member_id = ? ORDER BY payment_date DESC, id DESC");
+                $stmtHistory->execute([$m['id']]);
+                $m['payments'] = $stmtHistory->fetchAll(PDO::FETCH_ASSOC);
+            }
+
+            sendResponse(true, $members, 'Daftar subkon berhasil dimuat.');
+            break;
+
+        // -------------------------------------------------------------
         // 3. Project Detail with Sub-entities
         // -------------------------------------------------------------
         case 'project_detail':
@@ -213,80 +284,139 @@ try {
                 sendResponse(false, null, 'Nama proyek, nama klien, dan nilai kontrak (> 0) wajib diisi.', 422);
             }
 
-            // Generate project code and contract number
+            // Validasi DP Awal terhadap Nilai Kontrak
+            if ($initialDp < 0) {
+                sendResponse(false, null, 'Nominal DP awal tidak boleh bernilai negatif.', 422);
+            }
+            if ($contractValue < $initialDp) {
+                sendResponse(false, null, 'Nilai Kontrak (Rp ' . number_format($contractValue, 0, ',', '.') . ') tidak boleh lebih kecil dari DP Awal (Rp ' . number_format($initialDp, 0, ',', '.') . ').', 422);
+            }
+
+            // Generate unique project code and contract number
             $year = date('Y');
-            $countStmt = $pdo->query("SELECT COUNT(*) FROM projects");
-            $nextNum = ((int)$countStmt->fetchColumn()) + 1;
+            $stmtCodes = $pdo->prepare("SELECT project_code FROM projects WHERE project_code LIKE ?");
+            $stmtCodes->execute(["PRJ-{$year}-%"]);
+            $existingCodes = $stmtCodes->fetchAll(PDO::FETCH_COLUMN);
+
+            $maxNum = 0;
+            foreach ($existingCodes as $code) {
+                if (preg_match('/PRJ-\d{4}-(\d+)/', $code, $m)) {
+                    $val = (int)$m[1];
+                    if ($val > $maxNum) {
+                        $maxNum = $val;
+                    }
+                }
+            }
+            $nextNum = $maxNum + 1;
             $projectCode = sprintf("PRJ-%s-%03d", $year, $nextNum);
+
+            // Double check uniqueness loop to guarantee non-collision
+            while (true) {
+                $chk = $pdo->prepare("SELECT COUNT(*) FROM projects WHERE project_code = ?");
+                $chk->execute([$projectCode]);
+                if ((int)$chk->fetchColumn() === 0) {
+                    break;
+                }
+                $nextNum++;
+                $projectCode = sprintf("PRJ-%s-%03d", $year, $nextNum);
+            }
+
             $contractNumber = trim($data['contract_number'] ?? '');
             if (empty($contractNumber)) {
-                $contractNumber = sprintf("SPK/%s/%03d", $year, $nextNum);
+                $contractSeq = $nextNum;
+                while (true) {
+                    $candContract = sprintf("SPK/%s/%03d", $year, $contractSeq);
+                    $chkC = $pdo->prepare("SELECT COUNT(*) FROM projects WHERE contract_number = ?");
+                    $chkC->execute([$candContract]);
+                    if ((int)$chkC->fetchColumn() === 0) {
+                        $contractNumber = $candContract;
+                        break;
+                    }
+                    $contractSeq++;
+                }
             }
 
             $clientToken = 'portal-' . bin2hex(random_bytes(10));
-            $workflowStep = ($initialDp > 0) ? 'PENGERJAAN' : 'KONTRAK_DP';
+            $workflowStep = !empty($data['workflow_step']) ? trim($data['workflow_step']) : (($initialDp > 0) ? 'PENGERJAAN' : 'KONTRAK_DP');
+            $status = !empty($data['status']) ? trim($data['status']) : 'ACTIVE';
 
-            $stmt = $pdo->prepare("
-                INSERT INTO projects 
-                  (project_code, contract_number, contract_date, project_name, project_detail, client_name, client_phone, client_email, client_access_token, total_contract_value, start_date, deadline_date, max_revisions, current_revision, revision_deal_status, workflow_step, progress_percent, status, notes)
-                VALUES 
-                  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'PENDING', ?, ?, 'ACTIVE', ?)
-            ");
-            $stmt->execute([
-                $projectCode, $contractNumber, $contractDate, $projectName, $projectDetail, 
-                $clientName, $clientPhone, $clientEmail, $clientToken, $contractValue, 
-                $startDate, $deadlineDate, $maxRevisions, $workflowStep, $progressPercent, $notes
-            ]);
-            $newId = (int)$pdo->lastInsertId();
-
-            // Handle DP Awal jika ada
-            if ($initialDp > 0) {
-                $stmtDp = $pdo->prepare("
-                    INSERT INTO client_payments (project_id, invoice_number, payment_type, amount_paid, payment_date, payment_method, notes)
-                    VALUES (?, ?, 'DOWN_PAYMENT', ?, ?, 'TRANSFER', 'DP Awal saat pembuatan proyek')
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare("
+                    INSERT INTO projects 
+                      (project_code, contract_number, contract_date, project_name, project_detail, client_name, client_phone, client_email, client_access_token, total_contract_value, start_date, deadline_date, max_revisions, current_revision, revision_deal_status, workflow_step, progress_percent, status, notes)
+                    VALUES 
+                      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'PENDING', ?, ?, ?, ?)
                 ");
-                $invNumber = sprintf("INV-%s-%03d-DP", $year, $newId);
-                $stmtDp->execute([$newId, $invNumber, $initialDp, $startDate]);
-            }
+                $stmt->execute([
+                    $projectCode, $contractNumber, $contractDate, $projectName, $projectDetail, 
+                    $clientName, $clientPhone, $clientEmail, $clientToken, $contractValue, 
+                    $startDate, $deadlineDate, $maxRevisions, $workflowStep, $progressPercent, $status, $notes
+                ]);
+                $newId = (int)$pdo->lastInsertId();
 
-            // f. Sistem Pembayaran Input Manual (Dalam Uang / Rupiah, Bukan Persen)
-            $terms = $data['payment_terms'] ?? null;
-            if (is_array($terms) && count($terms) > 0) {
-                $stmtTerm = $pdo->prepare("
-                    INSERT INTO project_payment_terms (project_id, term_name, amount, due_date, status, paid_amount, paid_date, notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                foreach ($terms as $t) {
-                    $tName = trim($t['term_name'] ?? 'Termin');
-                    $tAmount = (float)($t['amount'] ?? 0);
-                    $tDue = !empty($t['due_date']) ? $t['due_date'] : null;
-                    $tStatus = in_array($t['status'] ?? '', ['PENDING', 'PAID', 'OVERDUE']) ? $t['status'] : 'PENDING';
-                    $tPaid = ($tStatus === 'PAID') ? $tAmount : (float)($t['paid_amount'] ?? 0);
-                    $tPaidDate = ($tStatus === 'PAID') ? (!empty($t['paid_date']) ? $t['paid_date'] : $startDate) : null;
-                    $tNotes = trim($t['notes'] ?? '');
+                // Handle DP Awal jika ada
+                if ($initialDp > 0) {
+                    $stmtDp = $pdo->prepare("
+                        INSERT INTO client_payments (project_id, invoice_number, payment_type, amount_paid, payment_date, payment_method, notes)
+                        VALUES (?, ?, 'DOWN_PAYMENT', ?, ?, 'TRANSFER', 'DP Awal saat pembuatan proyek')
+                    ");
+                    $invNumber = sprintf("INV-%s-%03d-DP", $year, $newId);
+                    $stmtDp->execute([$newId, $invNumber, $initialDp, $startDate]);
+                }
 
-                    if ($tAmount > 0) {
-                        $stmtTerm->execute([$newId, $tName, $tAmount, $tDue, $tStatus, $tPaid, $tPaidDate, $tNotes]);
+                // f. Sistem Pembayaran Input Manual (Dalam Uang / Rupiah, Bukan Persen)
+                $terms = $data['payment_terms'] ?? null;
+                if (is_array($terms) && count($terms) > 0) {
+                    $stmtTerm = $pdo->prepare("
+                        INSERT INTO project_payment_terms (project_id, term_name, amount, due_date, status, paid_amount, paid_date, notes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    foreach ($terms as $t) {
+                        $tName = trim($t['term_name'] ?? 'Termin');
+                        $tAmount = (float)($t['amount'] ?? 0);
+                        $tDue = !empty($t['due_date']) ? $t['due_date'] : null;
+                        $tStatus = in_array($t['status'] ?? '', ['PENDING', 'PAID', 'OVERDUE']) ? $t['status'] : 'PENDING';
+                        $tPaid = ($tStatus === 'PAID') ? $tAmount : (float)($t['paid_amount'] ?? 0);
+                        $tPaidDate = ($tStatus === 'PAID') ? (!empty($t['paid_date']) ? $t['paid_date'] : $startDate) : null;
+                        $tNotes = trim($t['notes'] ?? '');
+
+                        if ($tAmount > 0) {
+                            $stmtTerm->execute([$newId, $tName, $tAmount, $tDue, $tStatus, $tPaid, $tPaidDate, $tNotes]);
+                        }
+                    }
+                } else {
+                    // Auto-generate default terms in Rupiah (DP, Termin Pengerjaan, Pelunasan Akhir)
+                    $dpAmount = ($initialDp > 0) ? $initialDp : round($contractValue * 0.25);
+                    $remainingAfterDp = max(0, $contractValue - $dpAmount);
+                    $term2Amount = ($remainingAfterDp > 0) ? round($remainingAfterDp * 0.50) : 0;
+                    $pelunasanAmount = max(0, $remainingAfterDp - $term2Amount);
+
+                    $stmtTerm = $pdo->prepare("
+                        INSERT INTO project_payment_terms (project_id, term_name, amount, due_date, status, paid_amount, paid_date, notes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+
+                    $dpStatus = ($initialDp > 0) ? 'PAID' : 'PENDING';
+                    $dpPaidAmount = ($initialDp > 0) ? $initialDp : 0.00;
+                    $dpPaidDate = ($initialDp > 0) ? $startDate : null;
+
+                    $dpLabel = ($initialDp > 0) ? 'DP Awal' : 'DP Awal (25%)';
+                    $stmtTerm->execute([$newId, $dpLabel, $dpAmount, $startDate, $dpStatus, $dpPaidAmount, $dpPaidDate, 'DP Awal Kontrak']);
+                    if ($term2Amount > 0) {
+                        $stmtTerm->execute([$newId, 'Termin Pengerjaan', $term2Amount, $deadlineDate, 'PENDING', 0.00, null, 'Termin Pengerjaan Inti']);
+                    }
+                    if ($pelunasanAmount > 0) {
+                        $stmtTerm->execute([$newId, 'Pelunasan Akhir', $pelunasanAmount, $deadlineDate, 'PENDING', 0.00, null, 'Pelunasan Akhir setelah Deal']);
                     }
                 }
-            } else {
-                // Auto-generate default 3 terms in Rupiah (case Jonggol default: DP 25%, Termin 50%, Pelunasan 25%)
-                $dpAmount = ($initialDp > 0) ? $initialDp : round($contractValue * 0.25);
-                $term2Amount = round($contractValue * 0.50);
-                $pelunasanAmount = max(0, $contractValue - ($dpAmount + $term2Amount));
 
-                $stmtTerm = $pdo->prepare("
-                    INSERT INTO project_payment_terms (project_id, term_name, amount, due_date, status, paid_amount, paid_date, notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-
-                $dpStatus = ($initialDp > 0) ? 'PAID' : 'PENDING';
-                $dpPaidAmount = ($initialDp > 0) ? $initialDp : 0.00;
-                $dpPaidDate = ($initialDp > 0) ? $startDate : null;
-
-                $stmtTerm->execute([$newId, 'DP Awal (25%)', $dpAmount, $startDate, $dpStatus, $dpPaidAmount, $dpPaidDate, 'DP Awal Kontrak']);
-                $stmtTerm->execute([$newId, 'Termin Pengerjaan (50%)', $term2Amount, $deadlineDate, 'PENDING', 0.00, null, 'Termin Pengerjaan Inti']);
-                $stmtTerm->execute([$newId, 'Pelunasan Akhir (25%)', $pelunasanAmount, $deadlineDate, 'PENDING', 0.00, null, 'Pelunasan Akhir setelah Deal']);
+                $pdo->commit();
+            } catch (Exception $ex) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $ex;
             }
 
             sendResponse(true, [
@@ -305,13 +435,13 @@ try {
             if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
             $data = getRequestData();
 
-            $id = (int)($data['id'] ?? 0);
+            $id = (int)($data['id'] ?? ($data['project_id'] ?? 0));
             if ($id <= 0) sendResponse(false, null, 'Invalid Project ID', 400);
 
             $projectName = trim($data['project_name'] ?? '');
             $contractNumber = trim($data['contract_number'] ?? '');
             $contractDate = !empty($data['contract_date']) ? $data['contract_date'] : null;
-            $projectDetail = trim($data['project_detail'] ?? '');
+            $projectDetail = trim($data['project_detail'] ?? ($data['notes'] ?? ''));
             $clientName = trim($data['client_name'] ?? '');
             $clientPhone = trim($data['client_phone'] ?? '');
             $clientEmail = trim($data['client_email'] ?? '');
@@ -321,10 +451,19 @@ try {
             $maxRevisions = !empty($data['max_revisions']) ? max(1, (int)$data['max_revisions']) : 3;
             $progressPercent = isset($data['progress_percent']) ? max(0, min(100, (int)$data['progress_percent'])) : null;
             $workflowStep = $data['workflow_step'] ?? null;
+            $status = $data['status'] ?? ($data['project_status'] ?? null);
             $notes = trim($data['notes'] ?? '');
 
             if (empty($projectName) || empty($clientName) || $contractValue <= 0) {
                 sendResponse(false, null, 'Nama proyek, nama klien, dan nilai kontrak (> 0) wajib diisi.', 422);
+            }
+
+            // Validasi: Nilai kontrak baru tidak boleh lebih kecil dari total pembayaran klien yang sudah diterima
+            $stmtPaid = $pdo->prepare("SELECT COALESCE(SUM(amount_paid), 0) FROM client_payments WHERE project_id = ?");
+            $stmtPaid->execute([$id]);
+            $alreadyPaid = (float)$stmtPaid->fetchColumn();
+            if ($alreadyPaid > 0 && $contractValue < $alreadyPaid) {
+                sendResponse(false, null, 'Nilai kontrak baru (Rp ' . number_format($contractValue, 0, ',', '.') . ') tidak boleh lebih kecil dari total pembayaran yang sudah diterima dari klien (Rp ' . number_format($alreadyPaid, 0, ',', '.') . ').', 422);
             }
 
             $sql = "UPDATE projects SET 
@@ -344,6 +483,10 @@ try {
             if ($workflowStep !== null && in_array($workflowStep, ['KONTRAK_DP', 'PENGERJAAN', 'REVISI', 'PEMBAYARAN_AKHIR', 'DONE'])) {
                 $sql .= ", workflow_step = ?";
                 $params[] = $workflowStep;
+            }
+            if ($status !== null && in_array($status, ['ACTIVE', 'COMPLETED', 'ARCHIVED'])) {
+                $sql .= ", status = ?";
+                $params[] = $status;
             }
 
             $sql .= " WHERE id = ?";
@@ -502,6 +645,7 @@ try {
         // 4g. Revisions: Add New Revision (Checks Kuota Max Revisi Mayor)
         // -------------------------------------------------------------
         case 'add_revision':
+            requireCanEdit(true);
             if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
             $data = getRequestData();
 
@@ -567,6 +711,7 @@ try {
         // 4h. Flowchart Step: Revisi sampai dengan deal / maximal revisi
         // -------------------------------------------------------------
         case 'approve_revision_deal':
+            requireCanEdit(true);
             if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
             $data = getRequestData();
 
@@ -775,6 +920,22 @@ try {
                 sendResponse(false, null, 'ID Proyek dan nominal pembayaran (> 0) wajib diisi.', 422);
             }
 
+            // Validasi: nominal pembayaran tidak boleh melebihi sisa piutang proyek
+            $stmtPrj = $pdo->prepare("SELECT total_contract_value FROM projects WHERE id = ?");
+            $stmtPrj->execute([$projectId]);
+            $prjRow = $stmtPrj->fetch();
+            if ($prjRow) {
+                $prjContract = (float)$prjRow['total_contract_value'];
+                $stmtPaid = $pdo->prepare("SELECT COALESCE(SUM(amount_paid), 0) FROM client_payments WHERE project_id = ?");
+                $stmtPaid->execute([$projectId]);
+                $prjAlreadyPaid = (float)$stmtPaid->fetchColumn();
+                $remainingReceivable = max(0, $prjContract - $prjAlreadyPaid);
+
+                if ($amountPaid > $remainingReceivable) {
+                    sendResponse(false, null, 'Nominal pembayaran (Rp ' . number_format($amountPaid, 0, ',', '.') . ') melebihi sisa piutang proyek (Rp ' . number_format($remainingReceivable, 0, ',', '.') . ').', 422);
+                }
+            }
+
             // Generate invoice number
             $invNumber = trim($data['invoice_number'] ?? '');
             if (empty($invNumber)) {
@@ -848,6 +1009,30 @@ try {
             sendResponse(true, ['payment_id' => $pdo->lastInsertId()], 'Pencairan honor tim berhasil dicatat!');
             break;
 
+        case 'delete_team_member':
+            requireCanEdit(true);
+            if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
+            $data = getRequestData();
+            $id = (int)($data['id'] ?? 0);
+            if ($id <= 0) sendResponse(false, null, 'ID anggota subkon tidak valid.', 422);
+
+            $stmt = $pdo->prepare("DELETE FROM project_team_members WHERE id = ?");
+            $stmt->execute([$id]);
+            sendResponse(true, null, 'Data subkon berhasil dihapus.');
+            break;
+
+        case 'delete_team_payment':
+            requireCanEdit(true);
+            if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
+            $data = getRequestData();
+            $id = (int)($data['id'] ?? 0);
+            if ($id <= 0) sendResponse(false, null, 'ID pembayaran tidak valid.', 422);
+
+            $stmt = $pdo->prepare("DELETE FROM team_payments WHERE id = ?");
+            $stmt->execute([$id]);
+            sendResponse(true, null, 'Catatan pencairan honor berhasil dihapus.');
+            break;
+
         // -------------------------------------------------------------
         // 8. Update Project Notes / Keterangan
         // -------------------------------------------------------------
@@ -893,14 +1078,30 @@ try {
             requireCanEdit(true);
             if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
             $data = getRequestData();
-            $id = (int)($data['id'] ?? 0);
+            $id = (int)($data['id'] ?? ($data['project_id'] ?? 0));
 
             if ($id <= 0) sendResponse(false, null, 'Invalid Project ID', 400);
 
-            $stmt = $pdo->prepare("DELETE FROM projects WHERE id = ?");
-            $stmt->execute([$id]);
+            try {
+                $pdo->beginTransaction();
+                // Explicit delete for child records to ensure cross-database compatibility
+                $stmtTp = $pdo->prepare("DELETE tp FROM team_payments tp INNER JOIN project_team_members ptm ON tp.project_team_member_id = ptm.id WHERE ptm.project_id = ?");
+                $stmtTp->execute([$id]);
+                $pdo->prepare("DELETE FROM project_team_members WHERE project_id = ?")->execute([$id]);
+                $pdo->prepare("DELETE FROM client_payments WHERE project_id = ?")->execute([$id]);
+                $pdo->prepare("DELETE FROM project_payment_terms WHERE project_id = ?")->execute([$id]);
+                $pdo->prepare("DELETE FROM project_revisions WHERE project_id = ?")->execute([$id]);
+                $stmt = $pdo->prepare("DELETE FROM projects WHERE id = ?");
+                $stmt->execute([$id]);
+                $pdo->commit();
 
-            sendResponse(true, null, 'Proyek berhasil dihapus.');
+                sendResponse(true, null, 'Proyek berhasil dihapus beserta seluruh riwayat terkait.');
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                sendResponse(false, null, 'Gagal menghapus proyek: ' . $e->getMessage(), 500);
+            }
             break;
 
         // -------------------------------------------------------------
@@ -1193,9 +1394,13 @@ try {
             $history = is_array($data['conversation_history'] ?? null) ? $data['conversation_history'] : [];
             $includeContext = isset($data['include_context']) ? (bool)$data['include_context'] : true;
             $model = trim($data['model'] ?? 'gemini-1.5-flash');
+            $sessionId = trim($data['session_id'] ?? ($_GET['session_id'] ?? ''));
+
+            $currentUser = getCurrentUser();
+            $userId = $currentUser['id'] ?? null;
 
             $gemini = new GeminiService($pdo);
-            $res = $gemini->generateResponse($prompt, $apiKey, $history, $includeContext, $model);
+            $res = $gemini->generateResponse($prompt, $apiKey, $history, $includeContext, $model, $userId, $sessionId ?: null);
 
             if ($res['success']) {
                 sendResponse(true, $res, 'Respons Gemini berhasil diperoleh.');
@@ -1204,10 +1409,139 @@ try {
             }
             break;
 
+        // -------------------------------------------------------------
+        // 23. Gemini AI: Get Saved Chat History (Legacy / Global)
+        // -------------------------------------------------------------
+        case 'get_gemini_history':
+            $gemini = new GeminiService($pdo);
+            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 100;
+            $history = $gemini->getChatHistory($limit);
+            sendResponse(true, $history, 'Riwayat chat Gemini berhasil dimuat.');
+            break;
+
+        // -------------------------------------------------------------
+        // 23b. Gemini AI: Get Chat Sessions List
+        // -------------------------------------------------------------
+        case 'get_gemini_sessions':
+            $gemini = new GeminiService($pdo);
+            $search = trim($_GET['search'] ?? '');
+            $sessions = $gemini->getChatSessions(null, $search);
+            sendResponse(true, $sessions, 'Daftar riwayat sesi chat berhasil dimuat.');
+            break;
+
+        // -------------------------------------------------------------
+        // 23c. Gemini AI: Get Session Messages
+        // -------------------------------------------------------------
+        case 'get_gemini_session_messages':
+            $sessionId = trim($_GET['session_id'] ?? '');
+            if (empty($sessionId)) {
+                sendResponse(false, null, 'ID sesi diperlukan.', 422);
+            }
+            $gemini = new GeminiService($pdo);
+            $messages = $gemini->getSessionMessages($sessionId);
+            sendResponse(true, $messages, 'Pesan sesi berhasil dimuat.');
+            break;
+
+        // -------------------------------------------------------------
+        // 23d. Gemini AI: Create New Session
+        // -------------------------------------------------------------
+        case 'create_gemini_session':
+            if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
+            $data = getRequestData();
+            $title = trim($data['title'] ?? 'Obrolan Baru');
+            $currentUser = getCurrentUser();
+            $userId = $currentUser['id'] ?? null;
+            $gemini = new GeminiService($pdo);
+            $newSess = $gemini->createChatSession($title, $userId);
+            sendResponse(true, $newSess, 'Sesi obrolan baru berhasil dibuat.');
+            break;
+
+        // -------------------------------------------------------------
+        // 23e. Gemini AI: Delete Chat Session
+        // -------------------------------------------------------------
+        case 'delete_gemini_session':
+            if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
+            $data = getRequestData();
+            $sessionId = trim($data['session_id'] ?? ($_GET['session_id'] ?? ''));
+            if (empty($sessionId)) {
+                sendResponse(false, null, 'ID sesi diperlukan.', 422);
+            }
+            $gemini = new GeminiService($pdo);
+            $deleted = $gemini->deleteChatSession($sessionId);
+            if ($deleted) {
+                sendResponse(true, ['session_id' => $sessionId], 'Sesi obrolan berhasil dihapus.');
+            } else {
+                sendResponse(false, null, 'Gagal menghapus sesi obrolan.', 500);
+            }
+            break;
+
+        // -------------------------------------------------------------
+        // 23f. Gemini AI: Update Session Title
+        // -------------------------------------------------------------
+        case 'update_gemini_session_title':
+            if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
+            $data = getRequestData();
+            $sessionId = trim($data['session_id'] ?? '');
+            $title = trim($data['title'] ?? '');
+            if (empty($sessionId) || empty($title)) {
+                sendResponse(false, null, 'ID sesi dan judul diperlukan.', 422);
+            }
+            $gemini = new GeminiService($pdo);
+            $updated = $gemini->updateChatSessionTitle($sessionId, $title);
+            if ($updated) {
+                sendResponse(true, ['session_id' => $sessionId, 'title' => $title], 'Judul sesi berhasil diperbarui.');
+            } else {
+                sendResponse(false, null, 'Gagal memperbarui judul sesi.', 500);
+            }
+            break;
+
+        // -------------------------------------------------------------
+        // 24. Gemini AI: Clear All Chat History
+        // -------------------------------------------------------------
+        case 'clear_gemini_history':
+            if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
+            requireCanEdit(true);
+            $gemini = new GeminiService($pdo);
+            $cleared = $gemini->clearChatHistory();
+            if ($cleared) {
+                sendResponse(true, null, 'Riwayat obrolan AI berhasil dibersihkan.');
+            } else {
+                sendResponse(false, null, 'Gagal membersihkan riwayat obrolan AI.', 500);
+            }
+            break;
+
+        // -------------------------------------------------------------
+        // 25. Gemini AI: Delete Single Chat Message
+        // -------------------------------------------------------------
+        case 'delete_gemini_message':
+            if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
+            requireCanEdit(true);
+            $data = getRequestData();
+            $msgId = (int)($data['id'] ?? ($_GET['id'] ?? 0));
+            if ($msgId <= 0) {
+                sendResponse(false, null, 'ID pesan tidak valid.', 422);
+            }
+            $gemini = new GeminiService($pdo);
+            $deleted = $gemini->deleteChatMessage($msgId);
+            if ($deleted) {
+                sendResponse(true, ['id' => $msgId], 'Pesan berhasil dihapus.');
+            } else {
+                sendResponse(false, null, 'Gagal menghapus pesan.', 500);
+            }
+            break;
+
         default:
             sendResponse(false, null, "Aksi API '{$action}' tidak ditemukan.", 404);
             break;
     }
+} catch (PDOException $e) {
+    $msg = $e->getMessage();
+    if ($e->getCode() == 23000 || str_contains($msg, 'Integrity constraint violation')) {
+        if (str_contains($msg, 'Duplicate entry')) {
+            $msg = 'Terjadi duplikasi data unik (misal: kode proyek atau SPK sudah terdaftar). Silakan periksa kembali.';
+        }
+    }
+    sendResponse(false, null, 'Kesalahan Database: ' . $msg, 400);
 } catch (Exception $e) {
     sendResponse(false, null, 'Server Error: ' . $e->getMessage(), 500);
 }

@@ -19,7 +19,7 @@ export default function FilamentRoleInfoModal({ isOpen, onClose }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="w-full max-w-2xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5 animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
@@ -51,9 +51,9 @@ export default function FilamentRoleInfoModal({ isOpen, onClose }) {
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 font-extrabold uppercase text-[11px] border-b border-slate-200 dark:border-slate-800">
                 <th className="py-3 px-4">Fitur / Aksi</th>
-                <th className="py-3 px-3 text-center text-blue-600 dark:text-blue-400 font-bold">👑 Admin</th>
-                <th className="py-3 px-3 text-center text-emerald-600 dark:text-emerald-400 font-bold">💼 Finance</th>
-                <th className="py-3 px-3 text-center text-slate-600 dark:text-slate-300 font-bold">👁️ Viewer (Tamu)</th>
+                <th className="py-3 px-3 text-center text-blue-600 dark:text-blue-400 font-bold">Admin</th>
+                <th className="py-3 px-3 text-center text-emerald-600 dark:text-emerald-400 font-bold">Finance</th>
+                <th className="py-3 px-3 text-center text-slate-600 dark:text-slate-300 font-bold">Viewer</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-200">
@@ -107,22 +107,22 @@ export default function FilamentRoleInfoModal({ isOpen, onClose }) {
 
         {/* Roles Advice Card */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
-          <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 text-[11px]">
-            <strong className="text-blue-700 dark:text-blue-300 block mb-1">👑 ADMIN</strong>
+          <div className="p-3.5 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 text-xs">
+            <strong className="text-blue-700 dark:text-blue-300 block mb-1 font-bold">Admin</strong>
             <p className="text-slate-600 dark:text-slate-400 leading-snug">
               Untuk pemilik usaha / project lead. Akses 100% penuh termasuk mengelola seluruh user.
             </p>
           </div>
 
-          <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 text-[11px]">
-            <strong className="text-emerald-700 dark:text-emerald-300 block mb-1">💼 FINANCE</strong>
+          <div className="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 text-xs">
+            <strong className="text-emerald-700 dark:text-emerald-300 block mb-1 font-bold">Finance</strong>
             <p className="text-slate-600 dark:text-slate-400 leading-snug">
               Untuk bendahara / staf akunting. Mengelola arus kas proyek tanpa akses user management.
             </p>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-[11px]">
-            <strong className="text-slate-700 dark:text-slate-300 block mb-1">👁️ VIEWER</strong>
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs">
+            <strong className="text-slate-700 dark:text-slate-300 block mb-1 font-bold">Viewer</strong>
             <p className="text-slate-600 dark:text-slate-400 leading-snug">
               Untuk tamu / klien pengawas. Hanya melihat angka saldo & mengunduh cetak laporan PDF.
             </p>

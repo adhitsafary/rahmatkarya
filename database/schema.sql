@@ -46,6 +46,38 @@ CREATE TABLE `app_settings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
+-- 0c. Table: ai_chat_sessions (Sesi Percakapan Asisten AI Gemini)
+-- ---------------------------------------------------------------------
+DROP TABLE IF EXISTS `ai_chat_sessions`;
+CREATE TABLE `ai_chat_sessions` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `session_id` VARCHAR(64) NOT NULL UNIQUE,
+  `user_id` INT UNSIGNED NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_session_user` (`user_id`),
+  INDEX `idx_session_updated` (`updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
+-- 0d. Table: ai_chat_messages (Riwayat Percakapan Asisten AI Gemini)
+-- ---------------------------------------------------------------------
+DROP TABLE IF EXISTS `ai_chat_messages`;
+CREATE TABLE `ai_chat_messages` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT UNSIGNED NULL COMMENT 'ID pengguna yang mengirim prompt (opsional)',
+  `session_id` VARCHAR(64) NULL COMMENT 'ID sesi percakapan',
+  `role` ENUM('user', 'model') NOT NULL COMMENT 'Pengirim pesan: user atau AI model',
+  `message` LONGTEXT NOT NULL COMMENT 'Isi teks prompt atau balasan AI',
+  `model` VARCHAR(50) NULL DEFAULT 'gemini-1.5-flash' COMMENT 'Model AI yang digunakan',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_chat_user` (`user_id`),
+  INDEX `idx_chat_session` (`session_id`),
+  INDEX `idx_chat_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
 -- 1. Table: projects (Master Proyek Sesuai Diagram Flowchart)
 -- ---------------------------------------------------------------------
 DROP TABLE IF EXISTS `projects`;

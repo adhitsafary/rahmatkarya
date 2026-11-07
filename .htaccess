@@ -4,7 +4,6 @@
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /ASLI/Projectk2/
 
   # Allow direct access to backend PHP scripts
   RewriteRule \.php$ - [L]
@@ -21,3 +20,14 @@
   RewriteRule ^index\.html$ - [L]
   RewriteRule . index.html [L]
 </IfModule>
+
+# BEGIN cPanel-generated php ini directives, do not edit
+<IfModule php7_module>
+   php_value error_log "/home/netdigi1/logs/php.error.log"
+   php_flag log_errors On
+</IfModule>
+<IfModule lsapi_module>
+   php_value error_log "/home/netdigi1/logs/php.error.log"
+   php_flag log_errors On
+</IfModule>
+# END cPanel-generated php ini directives, do not edit

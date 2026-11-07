@@ -261,14 +261,13 @@ export default function FilamentUserManagement({ currentUser, showToast }) {
                   </td>
 
                   <td className="py-3.5 px-4 text-center">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black tracking-wide ${
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide ${
                       u.role === 'ADMIN'
                         ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800'
                         : u.role === 'FINANCE'
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800'
                         : 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
                     }`}>
-                      <span>{u.role === 'ADMIN' ? '👑' : u.role === 'FINANCE' ? '💼' : '👁️'}</span>
                       <span>{u.role}</span>
                     </span>
                   </td>
@@ -384,15 +383,15 @@ export default function FilamentUserManagement({ currentUser, showToast }) {
                     <option value="FINANCE">FINANCE</option>
                     <option value="VIEWER">VIEWER</option>
                   </select>
-                  <div className="mt-1 text-[10px] font-semibold">
+                  <div className="mt-1 text-xs text-slate-500">
                     {formCreate.role === 'ADMIN' && (
-                      <span className="text-blue-600 dark:text-blue-400">👑 Akses Penuh: Kelola Proyek, Kas & Pengguna</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-medium">Akses Penuh: Kelola Proyek, Kas & Pengguna</span>
                     )}
                     {formCreate.role === 'FINANCE' && (
-                      <span className="text-emerald-600 dark:text-emerald-400">💼 Kelola Kas & Proyek (Akses Pengguna Ditolak)</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">Kelola Keuangan: Kelola Kas & Proyek</span>
                     )}
                     {formCreate.role === 'VIEWER' && (
-                      <span className="text-slate-500 dark:text-slate-400">👁️ Tamu: Hanya melihat saldo & unduh laporan PDF</span>
+                      <span className="text-slate-500 dark:text-slate-400 font-medium">Lihat Saja: Hanya melihat saldo & unduh laporan</span>
                     )}
                   </div>
                 </div>
@@ -507,15 +506,15 @@ export default function FilamentUserManagement({ currentUser, showToast }) {
                     <option value="FINANCE">FINANCE</option>
                     <option value="VIEWER">VIEWER</option>
                   </select>
-                  <div className="mt-1 text-[10px] font-semibold">
+                  <div className="mt-1 text-xs text-slate-500">
                     {formEdit.role === 'ADMIN' && (
-                      <span className="text-blue-600 dark:text-blue-400">👑 Akses Penuh: Kelola Proyek, Kas & Pengguna</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-medium">Akses Penuh: Kelola Proyek, Kas & Pengguna</span>
                     )}
                     {formEdit.role === 'FINANCE' && (
-                      <span className="text-emerald-600 dark:text-emerald-400">💼 Kelola Kas & Proyek (Akses Pengguna Ditolak)</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">Kelola Keuangan: Kelola Kas & Proyek</span>
                     )}
                     {formEdit.role === 'VIEWER' && (
-                      <span className="text-slate-500 dark:text-slate-400">👁️ Tamu: Hanya melihat saldo & unduh laporan PDF</span>
+                      <span className="text-slate-500 dark:text-slate-400 font-medium">Lihat Saja: Hanya melihat saldo & unduh laporan</span>
                     )}
                   </div>
                 </div>

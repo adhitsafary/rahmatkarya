@@ -104,11 +104,23 @@ export async function apiCreateProject(data) {
   });
 }
 
+export async function apiUpdateProject(data) {
+  return request(`${API_BASE}?action=update_project`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+
 export async function apiAddClientPayment(data) {
   return request(`${API_BASE}?action=add_client_payment`, {
     method: 'POST',
     body: JSON.stringify(data)
   });
+}
+
+export async function apiGetTeamMembers(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`${API_BASE}?action=team_members${query ? '&' + query : ''}`);
 }
 
 export async function apiAddTeamMember(data) {
@@ -118,10 +130,38 @@ export async function apiAddTeamMember(data) {
   });
 }
 
+export async function apiDeleteTeamMember(id) {
+  return request(`${API_BASE}?action=delete_team_member`, {
+    method: 'POST',
+    body: JSON.stringify({ id })
+  });
+}
+
 export async function apiAddTeamPayment(data) {
   return request(`${API_BASE}?action=add_team_payment`, {
     method: 'POST',
     body: JSON.stringify(data)
+  });
+}
+
+export async function apiDeleteTeamPayment(id) {
+  return request(`${API_BASE}?action=delete_team_payment`, {
+    method: 'POST',
+    body: JSON.stringify({ id })
+  });
+}
+
+export async function apiAddRevision(data) {
+  return request(`${API_BASE}?action=add_revision`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+
+export async function apiApproveRevisionDeal(projectId) {
+  return request(`${API_BASE}?action=approve_revision_deal`, {
+    method: 'POST',
+    body: JSON.stringify({ project_id: projectId })
   });
 }
 
@@ -213,9 +253,63 @@ export async function apiTestGeminiKey(apiKey = null) {
   });
 }
 
-export async function apiGeminiPrompt(data) {
+export async function apiGeminiPrompt(promptOrData, includeContext = true, history = []) {
+  const payload = (typeof promptOrData === 'object' && promptOrData !== null)
+    ? promptOrData
+    : { 
+        prompt: promptOrData, 
+        include_context: includeContext, 
+        conversation_history: history 
+      };
   return request(`${API_BASE}?action=gemini_prompt`, {
     method: 'POST',
-    body: JSON.stringify(data)
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function apiGetGeminiHistory(limit = 100) {
+  return request(`${API_BASE}?action=get_gemini_history&limit=${limit}`);
+}
+
+export async function apiGetGeminiSessions(search = '') {
+  const query = search ? `&search=${encodeURIComponent(search)}` : '';
+  return request(`${API_BASE}?action=get_gemini_sessions${query}`);
+}
+
+export async function apiGetGeminiSessionMessages(sessionId) {
+  return request(`${API_BASE}?action=get_gemini_session_messages&session_id=${encodeURIComponent(sessionId)}`);
+}
+
+export async function apiCreateGeminiSession(title = 'Obrolan Baru') {
+  return request(`${API_BASE}?action=create_gemini_session`, {
+    method: 'POST',
+    body: JSON.stringify({ title })
+  });
+}
+
+export async function apiDeleteGeminiSession(sessionId) {
+  return request(`${API_BASE}?action=delete_gemini_session`, {
+    method: 'POST',
+    body: JSON.stringify({ session_id: sessionId })
+  });
+}
+
+export async function apiUpdateGeminiSessionTitle(sessionId, title) {
+  return request(`${API_BASE}?action=update_gemini_session_title`, {
+    method: 'POST',
+    body: JSON.stringify({ session_id: sessionId, title })
+  });
+}
+
+export async function apiClearGeminiHistory() {
+  return request(`${API_BASE}?action=clear_gemini_history`, {
+    method: 'POST'
+  });
+}
+
+export async function apiDeleteGeminiMessage(id) {
+  return request(`${API_BASE}?action=delete_gemini_message`, {
+    method: 'POST',
+    body: JSON.stringify({ id })
   });
 }

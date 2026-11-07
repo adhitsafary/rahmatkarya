@@ -8,13 +8,14 @@ export default function FilamentWhatsAppModal({ isOpen, project, onClose, showTo
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (project) {
+    if (isOpen && project) {
       setPhone(project.client_phone || '');
       const receivable = formatRupiah(project.client_receivable_remaining);
-      const text = `Halo Bapak/Ibu ${project.client_name},\n\nSemoga sehat dan sukses selalu. Kami ingin mengonfirmasi mengenai kelanjutan administrasi untuk *${project.project_name}*.\n\nBerdasarkan catatan rekapitulasi kami, sisa tagihan yang masih terbuka adalah sebesar *${receivable}*.\n\nBerikut kami lampirkan nomor rekening untuk kemudahan pembayaran:\nBank BCA: 123-456-7890 a.n Tim Manajemen Keuangan\n\nMohon konfirmasinya jika pembayaran telah disalurkan. Terima kasih banyak atas kerjasamanya! 🙏`;
+      const text = `Halo Bapak/Ibu ${project.client_name || 'Klien'},\n\nSemoga sehat dan sukses selalu. Kami ingin mengonfirmasi mengenai kelanjutan administrasi untuk *${project.project_name || 'Proyek'}*.\n\nBerdasarkan catatan rekapitulasi kami, sisa tagihan yang masih terbuka adalah sebesar *${receivable}*.\n\nBerikut kami lampirkan nomor rekening untuk kemudahan pembayaran:\nBank BCA: 123-456-7890 a.n Tim Manajemen Keuangan\n\nMohon konfirmasinya jika pembayaran telah disalurkan. Terima kasih banyak atas kerjasamanya!`;
       setMessage(text);
+      setCopied(false);
     }
-  }, [project]);
+  }, [isOpen, project]);
 
   if (!isOpen || !project) return null;
 
@@ -39,7 +40,7 @@ export default function FilamentWhatsAppModal({ isOpen, project, onClose, showTo
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-4">
         
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">

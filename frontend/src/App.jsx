@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Plus } from 'lucide-react';
 import { 
   apiGetCurrentUser, 
   apiLogout, 
@@ -12,7 +13,9 @@ import FilamentSidebar from './components/layout/FilamentSidebar';
 import FilamentTopbar from './components/layout/FilamentTopbar';
 import FilamentStatsOverview from './components/dashboard/FilamentStatsOverview';
 import FilamentTable from './components/dashboard/FilamentTable';
+import FilamentSubkonTable from './components/dashboard/FilamentSubkonTable';
 import FilamentAiTracker from './components/dashboard/FilamentAiTracker';
+import FilamentProjectDetailPage from './components/dashboard/FilamentProjectDetailPage';
 import FilamentUserManagement from './components/users/FilamentUserManagement';
 import FilamentLogin from './components/auth/FilamentLogin';
 import FilamentNotification from './components/common/FilamentNotification';
@@ -21,17 +24,18 @@ import FilamentNotification from './components/common/FilamentNotification';
 import FilamentCreateProjectModal from './components/modals/FilamentCreateProjectModal';
 import FilamentPaymentModal from './components/modals/FilamentPaymentModal';
 import FilamentWhatsAppModal from './components/modals/FilamentWhatsAppModal';
-import FilamentDetailModal from './components/modals/FilamentDetailModal';
 import FilamentEditNotesModal from './components/modals/FilamentEditNotesModal';
+import FilamentEditProjectModal from './components/modals/FilamentEditProjectModal';
+import FilamentDeleteConfirmModal from './components/modals/FilamentDeleteConfirmModal';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // App Theme: Default to Dark Ops/NOC Console, synchronized with 'procash_dark'
+  // App Theme: Default to Light Mode (Clean Minimalist SaaS 2026)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('procash_dark');
-    return saved !== null ? saved === 'true' : true;
+    return saved !== null ? saved === 'true' : false;
   });
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -42,7 +46,12 @@ export default function App() {
   // Active navigation tab & filter
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentFilter, setCurrentFilter] = useState('all');
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'grid';
+    }
+    return 'list';
+  });
   const [searchQuery, setSearchQuery] = useState('');
 
   const [summary, setSummary] = useState(null);
@@ -55,7 +64,14 @@ export default function App() {
   const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [notesModalOpen, setNotesModalOpen] = useState(false);
+  const [editProjectModalOpen, setEditProjectModalOpen] = useState(false);
+  const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [projectToEdit, setProjectToEdit] = useState(null);
+  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [detailRefreshTrigger, setDetailRefreshTrigger] = useState(0);
+  const [detailProjectId, setDetailProjectId] = useState(null);
+  const [previousTab, setPreviousTab] = useState('projects');
 
   // User permission check
   const canEdit = currentUser?.role !== 'VIEWER';
@@ -115,6 +131,7 @@ export default function App() {
   // Synchronized Tab Change
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
+    setDetailProjectId(null);
     if (tabId === 'receivables') {
       setCurrentFilter('need_billing');
     } else if (tabId === 'team') {
@@ -129,6 +146,7 @@ export default function App() {
   // Synchronized Table Filter Change
   const handleFilterChange = (filterId) => {
     setCurrentFilter(filterId);
+    setDetailProjectId(null);
     if (filterId === 'need_billing') {
       setActiveTab('receivables');
     } else if (filterId === 'need_payout') {
@@ -136,6 +154,15 @@ export default function App() {
     } else if (filterId === 'all' || filterId === 'settled') {
       setActiveTab('projects');
     }
+  };
+
+  const handleOpenDetail = (p) => {
+    if (!p) return;
+    const id = p.project_id || p.id;
+    setDetailProjectId(id);
+    setSelectedProject(p);
+    setPreviousTab(activeTab === 'project-detail' ? 'projects' : activeTab);
+    setActiveTab('project-detail');
   };
 
   // Fetch Dashboard & Projects Data
@@ -153,7 +180,15 @@ export default function App() {
     ]);
 
     if (sumRes.success) setSummary(sumRes.data);
-    if (projRes.success) setProjects(projRes.data);
+    if (projRes.success) {
+      setProjects(projRes.data);
+      setSelectedProject((prev) => {
+        if (!prev) return null;
+        const prevId = prev.project_id || prev.id;
+        const found = projRes.data.find((p) => (p.project_id || p.id) === prevId);
+        return found ? { ...prev, ...found } : prev;
+      });
+    }
     setLoading(false);
   }, [currentUser, activeTab, currentFilter, searchQuery]);
 
@@ -168,7 +203,9 @@ export default function App() {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        const input = document.querySelector('input[placeholder*="Cari"]');
+        const input = document.getElementById('global-search-input') || 
+                      document.querySelector('input[placeholder*="Search"]') || 
+                      document.querySelector('input[placeholder*="Cari"]');
         if (input) input.focus();
       }
     };
@@ -191,14 +228,46 @@ export default function App() {
     }
   };
 
+  const handleOpenEditProject = (project) => {
+    setProjectToEdit(project);
+    setEditProjectModalOpen(true);
+  };
+
+  const handleOpenDeleteProject = (project) => {
+    setProjectToDelete(project);
+    setDeleteConfirmModalOpen(true);
+  };
+
+  const handleDeleteSuccess = () => {
+    if (selectedProject && projectToDelete && ((selectedProject.project_id || selectedProject.id) === (projectToDelete.project_id || projectToDelete.id))) {
+      setDetailModalOpen(false);
+      setSelectedProject(null);
+      if (activeTab === 'project-detail') {
+        setActiveTab(previousTab || 'projects');
+        setDetailProjectId(null);
+      }
+    }
+    fetchData();
+  };
+
+  const handleEditSuccess = () => {
+    fetchData();
+    setDetailRefreshTrigger((t) => t + 1);
+  };
+
   const handleDeleteProject = async (id) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus proyek ini?')) return;
-    const res = await apiDeleteProject(id);
-    if (res.success) {
-      showToast(res.message);
-      fetchData();
+    const proj = projects.find(p => (p.project_id || p.id) === id);
+    if (proj) {
+      handleOpenDeleteProject(proj);
     } else {
-      showToast(res.message, 'danger');
+      if (!confirm('Apakah Anda yakin ingin menghapus proyek ini?')) return;
+      const res = await apiDeleteProject(id);
+      if (res.success) {
+        showToast(res.message);
+        fetchData();
+      } else {
+        showToast(res.message, 'danger');
+      }
     }
   };
 
@@ -207,10 +276,13 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white font-black text-base flex items-center justify-center animate-bounce shadow-lg shadow-amber-500/20">
-            RC
+          <div className="w-11 h-11 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-mono font-black text-sm flex items-center justify-center shadow-sm">
+            RK
           </div>
-          <span className="text-xs font-mono text-slate-400">Memuat Rekapitulasi Cashflow...</span>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-xs font-mono text-slate-500 dark:text-slate-400">Memuat Digital Wallet & Arus Kas...</span>
+          </div>
         </div>
       </div>
     );
@@ -273,11 +345,36 @@ export default function App() {
           onNewProject={() => setCreateModalOpen(true)}
         />
 
-        {/* Page Container */}
-        <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Page Container - Tight padding and fluid width matching Image 2 */}
+        <main className="w-full px-3.5 sm:px-5 lg:px-6 py-3 sm:py-4 space-y-3.5">
           
-          {/* USER MANAGEMENT PAGE */}
-          {activeTab === 'users' ? (
+          {/* DEDICATED FULL-PAGE PROJECT DETAIL */}
+          {activeTab === 'project-detail' && detailProjectId ? (
+            <FilamentProjectDetailPage
+              projectId={detailProjectId}
+              onBack={() => {
+                setActiveTab(previousTab || 'projects');
+                setDetailProjectId(null);
+              }}
+              onOpenPayment={(p) => {
+                setSelectedProject(p);
+                setPaymentModalOpen(true);
+              }}
+              onOpenWhatsApp={(p) => {
+                setSelectedProject(p);
+                setWhatsAppModalOpen(true);
+              }}
+              onOpenEdit={(p) => {
+                handleOpenEditProject(p);
+              }}
+              onOpenDelete={(p) => {
+                handleOpenDeleteProject(p);
+              }}
+              canEdit={canEdit}
+              showToast={showToast}
+              refreshTrigger={detailRefreshTrigger}
+            />
+          ) : activeTab === 'users' ? (
             <FilamentUserManagement 
               currentUser={currentUser} 
               showToast={showToast} 
@@ -293,39 +390,55 @@ export default function App() {
                 setSelectedProject(p);
                 setPaymentModalOpen(true);
               }}
-              onOpenDetail={(p) => {
-                setSelectedProject(p);
-                setDetailModalOpen(true);
-              }}
+              onOpenDetail={handleOpenDetail}
               showToast={showToast}
             />
           ) : (
             <>
               {/* DASHBOARD & PROJECTS VIEW */}
               
-              {/* Page Title & Synchronized Subtitle */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              {/* Page Title & Context Header matching Image 2 layout */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                    {activeTab === 'receivables' 
-                      ? 'Monitoring Piutang Klien' 
-                      : activeTab === 'team' 
-                      ? 'Plafon & Penyaluran Honor Tim Subkon' 
-                      : activeTab === 'projects'
-                      ? 'Daftar Semua Proyek'
-                      : 'Rekapitulasi Cashflow Proyek'
-                    }
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    {activeTab === 'receivables' 
-                      ? `Menampilkan ${projects.length} proyek dengan sisa tagihan terbuka yang belum diselesaikan klien`
-                      : activeTab === 'team'
-                      ? `Menampilkan ${projects.length} proyek dengan tanggungan honor vendor / subkon yang belum dibayarkan`
-                      : activeTab === 'projects'
-                      ? `Menampilkan seluruh ${projects.length} proyek aktif yang terdaftar dalam buku kas`
-                      : 'Monitoring kas riil di tangan, tagihan terbuka, dan pembayaran subkon'
-                    }
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                      {activeTab === 'receivables' 
+                        ? 'MONITORING PIUTANG KLIEN' 
+                        : activeTab === 'team' 
+                        ? 'HONOR TIM & BEBAN SUBKON' 
+                        : activeTab === 'projects'
+                        ? 'DAFTAR SEMUA PROYEK'
+                        : 'REKAPITULASI CASHFLOW PROYEK'
+                      }
+                    </h2>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                      {activeTab === 'receivables' ? 'PIUTANG' : activeTab === 'team' ? 'SUBKON' : activeTab === 'projects' ? 'SEMUA-PROYEK' : 'KAS-UTAMA'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                  <button
+                    onClick={() => {
+                      fetchData();
+                      showToast('Buku kas berhasil disinkronkan.');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-bold text-xs shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                    title="Sinkronisasi Arus Kas Sekarang"
+                  >
+                    <span>Sinkron Kas</span>
+                  </button>
+
+                  {canEdit && (
+                    <button
+                      onClick={() => setCreateModalOpen(true)}
+                      className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition cursor-pointer flex items-center gap-1.5"
+                      title="Tambah Proyek Baru"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Proyek Baru</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -336,41 +449,46 @@ export default function App() {
                 activeTab={activeTab} 
               />
 
-              {/* Filament Table Builder */}
-              <FilamentTable
-                projects={projects}
-                loading={loading}
-                currentFilter={currentFilter}
-                setFilter={handleFilterChange}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                viewMode={viewMode}
-                setViewMode={setViewMode}
-                canEdit={canEdit}
-                currentUser={currentUser}
-                onOpenDetail={(p) => {
-                  setSelectedProject(p);
-                  setDetailModalOpen(true);
-                }}
-                onOpenPayment={(p) => {
-                  setSelectedProject(p);
-                  setPaymentModalOpen(true);
-                }}
-                onOpenTeamPayment={(p) => {
-                  setSelectedProject(p);
-                  setDetailModalOpen(true);
-                }}
-                onOpenWhatsApp={(p) => {
-                  setSelectedProject(p);
-                  setWhatsAppModalOpen(true);
-                }}
-                onOpenEditNotes={(p) => {
-                  setSelectedProject(p);
-                  setNotesModalOpen(true);
-                }}
-                onToggleStatus={handleToggleStatus}
-                onDeleteProject={handleDeleteProject}
-              />
+              {/* Filament Table Builder (Subkon Table for 'team', Projects Table for others) */}
+              {activeTab === 'team' ? (
+                <FilamentSubkonTable
+                  projects={projects}
+                  currentUser={currentUser}
+                  canEdit={canEdit}
+                  onOpenDetail={handleOpenDetail}
+                  showToast={showToast}
+                />
+              ) : (
+                <FilamentTable
+                  projects={projects}
+                  loading={loading}
+                  currentFilter={currentFilter}
+                  setFilter={handleFilterChange}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  viewMode={viewMode}
+                  setViewMode={setViewMode}
+                  canEdit={canEdit}
+                  currentUser={currentUser}
+                  onOpenDetail={handleOpenDetail}
+                  onOpenPayment={(p) => {
+                    setSelectedProject(p);
+                    setPaymentModalOpen(true);
+                  }}
+                  onOpenTeamPayment={handleOpenDetail}
+                  onOpenWhatsApp={(p) => {
+                    setSelectedProject(p);
+                    setWhatsAppModalOpen(true);
+                  }}
+                  onOpenEditNotes={(p) => {
+                    setSelectedProject(p);
+                    setNotesModalOpen(true);
+                  }}
+                  onToggleStatus={handleToggleStatus}
+                  onOpenEditProject={handleOpenEditProject}
+                  onDeleteProject={handleOpenDeleteProject}
+                />
+              )}
             </>
           )}
 
@@ -391,7 +509,10 @@ export default function App() {
         isOpen={paymentModalOpen}
         project={selectedProject}
         onClose={() => setPaymentModalOpen(false)}
-        onSuccess={fetchData}
+        onSuccess={() => {
+          fetchData();
+          setDetailRefreshTrigger((t) => t + 1);
+        }}
         showToast={showToast}
       />
 
@@ -402,28 +523,36 @@ export default function App() {
         showToast={showToast}
       />
 
-      <FilamentDetailModal
-        isOpen={detailModalOpen}
-        project={selectedProject}
-        onClose={() => setDetailModalOpen(false)}
-        onRefresh={fetchData}
+      <FilamentEditProjectModal
+        isOpen={editProjectModalOpen}
+        project={projectToEdit}
+        onClose={() => {
+          setEditProjectModalOpen(false);
+          setProjectToEdit(null);
+        }}
+        onSuccess={handleEditSuccess}
         showToast={showToast}
-        canEdit={canEdit}
-        onOpenPayment={(p) => {
-          setSelectedProject(p);
-          setPaymentModalOpen(true);
+      />
+
+      <FilamentDeleteConfirmModal
+        isOpen={deleteConfirmModalOpen}
+        project={projectToDelete}
+        onClose={() => {
+          setDeleteConfirmModalOpen(false);
+          setProjectToDelete(null);
         }}
-        onOpenWhatsApp={(p) => {
-          setSelectedProject(p);
-          setWhatsAppModalOpen(true);
-        }}
+        onSuccess={handleDeleteSuccess}
+        showToast={showToast}
       />
 
       <FilamentEditNotesModal
         isOpen={notesModalOpen}
         project={selectedProject}
         onClose={() => setNotesModalOpen(false)}
-        onSuccess={fetchData}
+        onSuccess={() => {
+          fetchData();
+          setDetailRefreshTrigger((t) => t + 1);
+        }}
         showToast={showToast}
       />
 

@@ -15,265 +15,181 @@ export default function FilamentStatsOverview({ summary, projects = [], activeTa
   const globalTotalNetCash = summary?.total_net_cash ?? (globalTotalPaidClients - globalTotalPaidTeam);
 
   const globalTotalProjects = summary?.counts?.total ?? projects.length;
-  const globalActiveProjects = summary?.counts?.active ?? projects.filter(p => p.project_status === 'ACTIVE' || (parseFloat(p.client_receivable_remaining) > 0)).length;
-  const globalSettledProjects = summary?.counts?.settled ?? projects.filter(p => (parseFloat(p.client_receivable_remaining) <= 0 && parseFloat(p.team_payable_remaining) <= 0)).length;
-  const globalNonActiveProjects = Math.max(0, globalTotalProjects - globalActiveProjects);
 
-  // Context-specific totals (from projects currently shown)
-  const currentContract = projects.reduce((s, p) => s + (parseFloat(p.total_contract_value) || 0), 0);
-  const currentPaidClients = projects.reduce((s, p) => s + (parseFloat(p.total_paid_by_client) || 0), 0);
+  // Context-specific totals
   const currentReceivables = projects.reduce((s, p) => s + (parseFloat(p.client_receivable_remaining) || 0), 0);
-  const currentTeamHonor = projects.reduce((s, p) => s + (parseFloat(p.total_agreed_team_honor) || 0), 0);
-  const currentPaidTeam = projects.reduce((s, p) => s + (parseFloat(p.total_paid_to_team) || 0), 0);
   const currentPayables = projects.reduce((s, p) => s + (parseFloat(p.team_payable_remaining) || 0), 0);
-  const currentCount = projects.length;
+  const currentTeamHonor = projects.reduce((s, p) => s + (parseFloat(p.total_agreed_team_honor) || 0), 0);
 
-  // 1. DAFTAR SEMUA PROYEK (NOC DevOps KPI Cards)
-  if (activeTab === 'projects') {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {/* Card 1: TOTAL PROYEK */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-blue-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-            TOTAL PROYEK
-          </div>
-          <div className="text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight">
-            {globalTotalProjects}
-          </div>
-          <div className="text-[11px] text-slate-400 font-mono mt-1">
-            Semua Terdaftar
-          </div>
-        </div>
+  const paidPercent = calcPercent(globalTotalPaidClients, globalTotalContract);
+  const receivablePercent = calcPercent(globalTotalReceivables, globalTotalContract);
+  const subkonPercent = globalTotalContract > 0 ? Math.round((globalTotalPaidTeam / globalTotalContract) * 100) : 0;
 
-        {/* Card 2: PROYEK AKTIF */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-blue-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1.5">
-            ONLINE (AKTIF)
-          </div>
-          <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 tracking-tight">
-            {globalActiveProjects}
-          </div>
-          <div className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 font-mono mt-1">
-            {calcPercent(globalActiveProjects, globalTotalProjects)}% Berjalan
-          </div>
-        </div>
+  // Configure hero context according to active tab
+  let heroConfig = {
+    title: 'TOTAL SALDO KAS BERSIH DI TANGAN',
+    amount: globalTotalNetCash,
+    caption: 'Arus kas riil siap pakai setelah penyaluran honor tim & beban subkon',
+    badgeText: `${paidPercent}% Masuk`,
+    badgeClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/60'
+  };
 
-        {/* Card 3: PROYEK SELESAI */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-blue-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-            SELESAI (DEAL/LUNAS)
-          </div>
-          <div className="text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight">
-            {globalSettledProjects}
-          </div>
-          <div className="text-[11px] text-slate-400 font-mono mt-1">
-            {globalNonActiveProjects > 0 ? `${globalNonActiveProjects} Nonaktif` : '100% Tuntas'}
-          </div>
-        </div>
-
-        {/* Card 4: NILAI KONTRAK */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-blue-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1.5">
-            TOTAL NILAI SPK
-          </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight truncate">
-            {formatRupiah(globalTotalContract)}
-          </div>
-          <div className="text-[11px] text-blue-600/80 dark:text-blue-400/80 font-mono mt-1">
-            Akumulasi Portofolio
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 2. MONITORING PIUTANG KLIEN
   if (activeTab === 'receivables') {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {/* Card 1: TOTAL SISA PIUTANG */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-rose-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1.5">
-            SISA PIUTANG (UNPAID)
-          </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-rose-600 dark:text-rose-400 tracking-tight truncate">
-            {formatRupiah(currentReceivables)}
-          </div>
-          <div className="text-[11px] text-rose-500 font-mono mt-1">
-            Tagihan Terbuka
-          </div>
-        </div>
-
-        {/* Card 2: PROYEK BELUM LUNAS */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-amber-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1.5">
-            PROYEK PERLU DITAGIH
-          </div>
-          <div className="text-2xl font-black font-mono text-amber-600 dark:text-amber-400 tracking-tight">
-            {currentCount}
-          </div>
-          <div className="text-[11px] text-amber-500 font-mono mt-1">
-            Menunggu Pelunasan
-          </div>
-        </div>
-
-        {/* Card 3: DP / TERMIN SUDAH MASUK */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-emerald-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1.5">
-            DP / MASUK DITERIMA
-          </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 tracking-tight truncate">
-            {formatRupiah(currentPaidClients)}
-          </div>
-          <div className="text-[11px] text-emerald-500 font-mono mt-1">
-            Realisasi Uang Masuk
-          </div>
-        </div>
-
-        {/* Card 4: PERSENTASE TERTAGIH */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-blue-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1.5">
-            PROGRES TERTAGIH
-          </div>
-          <div className="text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight">
-            {calcPercent(currentPaidClients, currentContract)}%
-          </div>
-          <div className="text-[11px] text-slate-400 font-mono mt-1 truncate">
-            Pagu {formatRupiah(currentContract)}
-          </div>
-        </div>
-      </div>
-    );
+    heroConfig = {
+      title: 'TOTAL SISA PIUTANG TERBUKA',
+      amount: currentReceivables,
+      caption: `Tagihan terbuka yang belum diselesaikan klien dari ${projects.length} proyek aktif`,
+      badgeText: `${receivablePercent}% Terbuka`,
+      badgeClass: 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border-rose-200/80 dark:border-rose-800/60'
+    };
+  } else if (activeTab === 'team') {
+    heroConfig = {
+      title: 'SISA HONOR BELUM DICAIRKAN',
+      amount: currentPayables,
+      caption: `Kewajiban pembayaran subkon dari plafon disetujui ${formatRupiah(currentTeamHonor)}`,
+      badgeText: 'Subkon Pending',
+      badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/60'
+    };
+  } else if (activeTab === 'projects') {
+    heroConfig = {
+      title: 'TOTAL NILAI KONTRAK SPK',
+      amount: globalTotalContract,
+      caption: `${globalTotalProjects} proyek terdaftar • ${projects.length} ditampilkan dalam filter aktif`,
+      badgeText: `${globalTotalProjects} Proyek`,
+      badgeClass: 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border-blue-200/80 dark:border-blue-800/60'
+    };
   }
 
-  // 3. HONOR TIM SUBKON
-  if (activeTab === 'team') {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {/* Card 1: SISA HUTANG KE TIM */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-amber-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1.5">
-            SISA HUTANG KE TIM
-          </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-amber-600 dark:text-amber-400 tracking-tight truncate">
-            {formatRupiah(currentPayables)}
-          </div>
-          <div className="text-[11px] text-amber-500 font-mono mt-1">
-            Belum Dicairkan
-          </div>
-        </div>
-
-        {/* Card 2: PROYEK BELUM PAYOUT */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-rose-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1.5">
-            MENUNGGU PAYOUT
-          </div>
-          <div className="text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight">
-            {currentCount}
-          </div>
-          <div className="text-[11px] text-rose-500 font-mono mt-1">
-            Vendor / Subkon Terbuka
-          </div>
-        </div>
-
-        {/* Card 3: PLAFON HONOR DISETUJUI */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-blue-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1.5">
-            PLAFON HONOR TIM
-          </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight truncate">
-            {formatRupiah(currentTeamHonor)}
-          </div>
-          <div className="text-[11px] text-blue-500 font-mono mt-1">
-            Total Pagu Alokasi
-          </div>
-        </div>
-
-        {/* Card 4: REALISASI HONOR DIBAYAR */}
-        <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-emerald-500/40 shadow-xs transition">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1.5">
-            REALISASI DIBAYAR
-          </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 tracking-tight truncate">
-            {formatRupiah(currentPaidTeam)}
-          </div>
-          <div className="text-[11px] text-emerald-500 font-mono mt-1">
-            {calcPercent(currentPaidTeam, currentTeamHonor)}% Honor Tersalurkan
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 4. DEFAULT: RINGKASAN KAS (DASHBOARD FINANSIAL CASHFLOW GLOBAL)
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {/* 1. Kas Bersih Tersedia */}
-      <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-emerald-500/40 shadow-xs transition">
-        <div className="flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1.5">
-          <span>KAS BERSIH DI TANGAN</span>
-          <button 
-            onClick={() => setHideBalance(!hideBalance)}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
-            title={hideBalance ? 'Tampilkan' : 'Sembunyikan'}
-          >
-            {hideBalance ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-          </button>
+    <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 shadow-xs transition-colors space-y-4">
+      
+      {/* Top Split: Left Hero Figure vs Right 4-Pillar Cluster (Image 2 style) */}
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+        
+        {/* Left Side: Major Metric Display */}
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+            {heroConfig.title}
+          </div>
+
+          <div className="mt-1 flex flex-wrap items-baseline gap-2 sm:gap-2.5">
+            <span className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-mono tracking-tight text-slate-900 dark:text-white">
+              {hideBalance ? 'Rp ••••••••••' : formatRupiah(heroConfig.amount)}
+            </span>
+            <span className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 font-mono">
+              IDR
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${heroConfig.badgeClass}`}>
+              {heroConfig.badgeText}
+            </span>
+            <button
+              onClick={() => setHideBalance(!hideBalance)}
+              className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition cursor-pointer"
+              title={hideBalance ? 'Tampilkan Nominal' : 'Sembunyikan Nominal'}
+            >
+              {hideBalance ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
+          <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
+            {heroConfig.caption}
+          </p>
         </div>
 
-        <div className="text-xl sm:text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 tracking-tight truncate">
-          {hideBalance ? 'Rp ••••••••' : formatRupiah(globalTotalNetCash)}
+        {/* Right Side: 4 Status Columns matching Image 2 */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800 shrink-0">
+          
+          {/* Item 1: Total Kontrak SPK (Online state style) */}
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
+              <span>Kontrak SPK</span>
+            </div>
+            <div className="text-sm sm:text-base font-extrabold font-mono text-slate-900 dark:text-white truncate">
+              {formatRupiah(globalTotalContract)}
+            </div>
+            <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+              {globalTotalProjects} Proyek Terdaftar
+            </div>
+          </div>
+
+          {/* Item 2: Termin Diterima (Online working state style) */}
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span>Termin Masuk</span>
+            </div>
+            <div className="text-sm sm:text-base font-extrabold font-mono text-emerald-600 dark:text-emerald-400 truncate">
+              {formatRupiah(globalTotalPaidClients)}
+            </div>
+            <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 truncate">
+              {paidPercent}% Realisasi
+            </div>
+          </div>
+
+          {/* Item 3: Sisa Piutang Klien (LOS / Cut state style) */}
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+              <span>Sisa Piutang</span>
+            </div>
+            <div className="text-sm sm:text-base font-extrabold font-mono text-rose-600 dark:text-rose-400 truncate">
+              {formatRupiah(globalTotalReceivables)}
+            </div>
+            <div className="text-[10px] text-rose-500/80 dark:text-rose-400/80 truncate">
+              Tagihan Terbuka
+            </div>
+          </div>
+
+          {/* Item 4: Sisa Honor Subkon (Dying Gasp power loss style) */}
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              <span>Honor Subkon</span>
+            </div>
+            <div className="text-sm sm:text-base font-extrabold font-mono text-amber-600 dark:text-amber-400 truncate">
+              {formatRupiah(globalTotalPayables)}
+            </div>
+            <div className="text-[10px] text-amber-600/80 dark:text-amber-400/80 truncate">
+              Plafon: {formatRupiah(globalTotalTeamHonor)}
+            </div>
+          </div>
+
         </div>
 
-        <div className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 font-mono mt-1">
-          Kas Riil Siap Pakai
+      </div>
+
+      {/* Bottom Section: Progress Bar matching Image 2 */}
+      <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 gap-1 font-mono">
+          <span className="font-bold uppercase tracking-wider text-[10px]">
+            DISTRIBUSI ARUS KAS & TERMIN
+          </span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">
+            Termin: <strong className="text-emerald-600 dark:text-emerald-400">{paidPercent}%</strong> ({formatRupiah(globalTotalPaidClients)}) &bull; Piutang: <strong className="text-rose-600 dark:text-rose-400">{receivablePercent}%</strong> &bull; Subkon: <strong className="text-amber-600 dark:text-amber-400">{subkonPercent}%</strong>
+          </span>
+        </div>
+
+        {/* Multi-segmented distribution progress bar */}
+        <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
+          <div 
+            className="h-full bg-emerald-500 transition-all duration-300"
+            style={{ width: `${paidPercent}%` }}
+            title={`Termin Diterima: ${paidPercent}%`}
+          />
+          <div 
+            className="h-full bg-amber-400 transition-all duration-300"
+            style={{ width: `${Math.min(10, subkonPercent)}%` }}
+            title={`Beban Subkon: ${subkonPercent}%`}
+          />
+          <div 
+            className="h-full bg-rose-500 transition-all duration-300"
+            style={{ width: `${receivablePercent}%` }}
+            title={`Sisa Piutang: ${receivablePercent}%`}
+          />
         </div>
       </div>
 
-      {/* 2. Total Tagihan Kontrak */}
-      <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-blue-500/40 shadow-xs transition">
-        <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1.5">
-          TOTAL NILAI KONTRAK
-        </div>
-
-        <div className="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white tracking-tight truncate">
-          {formatRupiah(globalTotalContract)}
-        </div>
-
-        <div className="text-[11px] text-slate-400 font-mono mt-1">
-          {globalTotalProjects} Proyek Terdaftar
-        </div>
-      </div>
-
-      {/* 3. Sisa Piutang Klien (Receivables) */}
-      <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-rose-500/40 shadow-xs transition">
-        <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1.5">
-          SISA PIUTANG KLIEN
-        </div>
-
-        <div className="text-xl sm:text-2xl font-black font-mono text-rose-600 dark:text-rose-400 tracking-tight truncate">
-          {formatRupiah(globalTotalReceivables)}
-        </div>
-
-        <div className="text-[11px] text-rose-500 font-mono mt-1">
-          Tagihan Terbuka
-        </div>
-      </div>
-
-      {/* 4. Sisa Tanggungan Tim (Payables) */}
-      <div className="p-4 rounded-xl bg-white dark:bg-[#0A1324] border border-slate-200/80 dark:border-[#162540] hover:border-slate-300 dark:hover:border-amber-500/40 shadow-xs transition">
-        <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1.5">
-          SISA HONOR TIM
-        </div>
-
-        <div className="text-xl sm:text-2xl font-black font-mono text-amber-600 dark:text-amber-400 tracking-tight truncate">
-          {formatRupiah(globalTotalPayables)}
-        </div>
-
-        <div className="text-[11px] text-amber-500 font-mono mt-1 truncate">
-          Plafon: {formatRupiah(globalTotalTeamHonor)}
-        </div>
-      </div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ export default function FilamentNotification({ toast, onClose }) {
   const isSuccess = !isError && !isWarning;
 
   return (
-    <div className="fixed top-5 right-5 z-50 max-w-sm w-full animate-in fade-in slide-in-from-top-4 duration-200">
+    <div className="fixed top-5 right-5 z-[9999] max-w-sm w-full animate-in fade-in slide-in-from-top-4 duration-200 pointer-events-auto">
       <div className={`p-4 rounded-2xl border shadow-2xl backdrop-blur-md flex items-start gap-3 transition-colors ${
         isError 
           ? 'bg-rose-50/95 border-rose-200 text-rose-900 dark:bg-rose-950/90 dark:border-rose-900 dark:text-rose-100'

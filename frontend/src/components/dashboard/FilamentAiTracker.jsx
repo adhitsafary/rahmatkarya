@@ -1,52 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  CheckCircle2, 
-  RefreshCw,
   Key,
   Send,
   Copy,
   Eye,
   EyeOff,
-  AlertCircle
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Database,
+  Filter,
+  Search,
+  Plus,
+  PanelLeft,
+  X
 } from 'lucide-react';
-import { formatRupiah } from '../../utils/format';
 import { 
-  apiGetAiAnalysis, 
-  apiGetAiProjectAnalysis, 
-  apiValidatePayment,
-  apiGetGeminiKey,
-  apiSaveGeminiKey,
-  apiTestGeminiKey,
-  apiGeminiPrompt
+  apiGetGeminiKey, 
+  apiSaveGeminiKey, 
+  apiTestGeminiKey, 
+  apiGeminiPrompt,
+  apiGetGeminiHistory,
+  apiGetGeminiSessions,
+  apiGetGeminiSessionMessages,
+  apiCreateGeminiSession,
+  apiDeleteGeminiSession,
+  apiClearGeminiHistory,
+  apiDeleteGeminiMessage
 } from '../../services/api';
 
 export default function FilamentAiTracker({
   projects = [],
-  onOpenWhatsApp,
-  onOpenPayment,
-  onOpenDetail,
   showToast
 }) {
-  const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'project' | 'simulator' | 'gemini'
-  const [aiData, setAiData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [issueFilter, setIssueFilter] = useState('all');
-
-  // Deep dive
-  const [selectedProjectId, setSelectedProjectId] = useState('');
-  const [projectAudit, setProjectAudit] = useState(null);
-  const [projectLoading, setProjectLoading] = useState(false);
-
-  // Simulator
-  const [simForm, setSimForm] = useState({
-    project_id: '',
-    type: 'CLIENT_PAYMENT',
-    amount: '',
-    member_id: ''
-  });
-  const [simResult, setSimResult] = useState(null);
-  const [simLoading, setSimLoading] = useState(false);
-
   // Gemini AI State
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [savedKeyMasked, setSavedKeyMasked] = useState('');
@@ -55,14 +44,62 @@ export default function FilamentAiTracker({
   const [geminiTesting, setGeminiTesting] = useState(false);
   const [promptInput, setPromptInput] = useState('');
   const [geminiLoading, setGeminiLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [includeContext, setIncludeContext] = useState(true);
-  const [conversation, setConversation] = useState([
-    {
-      role: 'model',
-      text: 'Halo! Saya asisten finansial cerdas Google Gemini yang terhubung langsung dengan portofolio proyek dan arus kas Rahmat-Karya Anda.\n\nAnda dapat menanyakan hal seperti:\n• "Analisis risiko pembayaran pada proyek aktif saat ini"\n• "Buatkan draf pesan WhatsApp sopan untuk menagih termin klien yang belum bayar"\n• "Apakah kas kita cukup aman untuk membayar honor tim bulan ini?"\n\nSilakan masukkan Google Gemini API Key Anda di atas untuk mulai berkonsultasi!',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-  ]);
+
+  // Chat Sessions & History Sidebar State
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [activeSessionTitle, setActiveSessionTitle] = useState('Obrolan Baru');
+  const [showHistorySidebar, setShowHistorySidebar] = useState(true);
+  const [historySearch, setHistorySearch] = useState('');
+  const [showSearchInput, setShowSearchInput] = useState(false);
+
+  // Toggle Hide/Show States (default: clean compact view, persistent across sessions)
+  const [showKeyCard, setShowKeyCard] = useState(() => {
+    const saved = localStorage.getItem('gemini_show_key_card_v2');
+    if (saved !== null) return saved === 'true';
+    return false; // Default: closed/clean
+  });
+
+  const [headerCollapsed, setHeaderCollapsed] = useState(() => {
+    const saved = localStorage.getItem('gemini_header_collapsed_v2');
+    if (saved !== null) return saved === 'true';
+    return true; // Default: collapsed/clean
+  });
+
+  // Clean legacy storage keys so new default takes effect
+  useEffect(() => {
+    localStorage.removeItem('gemini_show_key_card');
+    localStorage.removeItem('gemini_header_collapsed');
+  }, []);
+
+  const toggleShowKeyCard = () => {
+    setShowKeyCard(prev => {
+      const next = !prev;
+      localStorage.setItem('gemini_show_key_card_v2', next ? 'true' : 'false');
+      return next;
+    });
+  };
+
+  const toggleHeaderCollapsed = () => {
+    setHeaderCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('gemini_header_collapsed_v2', next ? 'true' : 'false');
+      return next;
+    });
+  };
+
+  const initialGreeting = {
+    role: 'model',
+    text: 'Halo! Saya asisten finansial cerdas Google Gemini yang terhubung langsung dengan portofolio proyek dan arus kas Rahmat-Karya Anda.\n\nAnda dapat menanyakan hal seperti:\n• "Analisis risiko pembayaran pada proyek aktif saat ini"\n• "Buatkan draf pesan WhatsApp sopan untuk menagih termin klien yang belum bayar"\n• "Apakah kas kita cukup aman untuk membayar honor tim bulan ini?"\n\nSilakan masukkan Google Gemini API Key Anda di atas untuk mulai berkonsultasi!',
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    date: new Date().toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })
+  };
+
+  const [conversation, setConversation] = useState([initialGreeting]);
+  const chatBottomRef = useRef(null);
 
   const quickPrompts = [
     "Analisis risiko keuangan & piutang saat ini",
@@ -71,39 +108,132 @@ export default function FilamentAiTracker({
     "Rekomendasi prioritas penagihan & pembayaran minggu ini"
   ];
 
-  const fetchAiData = async () => {
-    setLoading(true);
-    try {
-      const res = await apiGetAiAnalysis();
-      if (res.success) {
-        setAiData(res.data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAiData();
-    fetchKeyStatus();
-  }, []);
-
   const fetchKeyStatus = async () => {
     try {
       const res = await apiGetGeminiKey();
       if (res.success && res.data) {
         setHasKey(res.data.has_key);
-        setSavedKeyMasked(res.data.key_masked || '');
+        setSavedKeyMasked(res.data.key_masked || res.data.masked_key || '');
       }
     } catch (e) {
       console.error(e);
     }
   };
 
+  // Fetch all chat sessions from DB
+  const fetchSessions = async (autoSelectLatest = false) => {
+    try {
+      setSessionsLoading(true);
+      const res = await apiGetGeminiSessions();
+      if (res.success && Array.isArray(res.data)) {
+        setSessions(res.data);
+        if (autoSelectLatest && res.data.length > 0) {
+          const first = res.data[0];
+          setActiveSessionId(first.session_id);
+          setActiveSessionTitle(first.title);
+          loadSessionMessages(first.session_id);
+        } else if (res.data.length === 0) {
+          setConversation([initialGreeting]);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load chat sessions:', e);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  // Load messages for a specific session
+  const loadSessionMessages = async (sessionId) => {
+    if (!sessionId) return;
+    try {
+      setHistoryLoading(true);
+      const res = await apiGetGeminiSessionMessages(sessionId);
+      if (res.success && Array.isArray(res.data)) {
+        const loaded = res.data.map(m => ({
+          id: m.id,
+          session_id: m.session_id,
+          role: m.role,
+          text: m.text || m.message,
+          time: m.time || (m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''),
+          date: m.date || (m.created_at ? new Date(m.created_at).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' }) : ''),
+          userName: m.user_name,
+          userRole: m.user_role,
+          model: m.model,
+          isFromDb: true
+        }));
+        setConversation(loaded.length > 0 ? [initialGreeting, ...loaded] : [initialGreeting]);
+      } else {
+        setConversation([initialGreeting]);
+      }
+    } catch (e) {
+      console.error('Failed to load session messages:', e);
+      setConversation([initialGreeting]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchKeyStatus();
+    fetchSessions(true);
+  }, []);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversation, geminiLoading]);
+
+  const handleSelectSession = (sessionId) => {
+    if (activeSessionId === sessionId) return;
+    const sess = sessions.find(s => s.session_id === sessionId);
+    setActiveSessionId(sessionId);
+    setActiveSessionTitle(sess?.title || 'Obrolan');
+    loadSessionMessages(sessionId);
+  };
+
+  const handleNewChat = () => {
+    setActiveSessionId(null);
+    setActiveSessionTitle('Obrolan Baru');
+    setConversation([initialGreeting]);
+    setPromptInput('');
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    if (!confirm('Hapus sesi obrolan ini dari database? Riwayat yang dihapus tidak dapat dipulihkan.')) return;
+    try {
+      const res = await apiDeleteGeminiSession(sessionId);
+      if (res.success) {
+        setSessions(prev => prev.filter(s => s.session_id !== sessionId));
+        if (activeSessionId === sessionId) {
+          handleNewChat();
+        }
+        if (showToast) showToast('Sesi obrolan berhasil dihapus.');
+      } else {
+        if (showToast) showToast(res.message || 'Gagal menghapus sesi.', 'error');
+      }
+    } catch (e) {
+      if (showToast) showToast('Gagal menghubungi server.', 'error');
+    }
+  };
+
+  const handleClearAllSessions = async () => {
+    if (!confirm('Yakin ingin membersihkan SEMUA riwayat obrolan AI dari database? Seluruh sesi percakapan akan dihapus secara permanen.')) return;
+    try {
+      const res = await apiClearGeminiHistory();
+      if (res.success) {
+        setSessions([]);
+        handleNewChat();
+        if (showToast) showToast('Seluruh riwayat obrolan berhasil dibersihkan.');
+      } else {
+        if (showToast) showToast(res.message || 'Gagal membersihkan riwayat.', 'error');
+      }
+    } catch (e) {
+      if (showToast) showToast('Gagal menghubungi server.', 'error');
+    }
+  };
+
   const handleSaveKey = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!geminiApiKey.trim()) return;
     try {
       const res = await apiSaveGeminiKey(geminiApiKey.trim());
@@ -119,50 +249,121 @@ export default function FilamentAiTracker({
     }
   };
 
+  const handleDeleteKey = async () => {
+    if (!confirm('Yakin ingin menghapus Google Gemini API Key yang tersimpan?')) return;
+    try {
+      const res = await apiSaveGeminiKey('');
+      if (res.success) {
+        if (showToast) showToast('API Key Gemini berhasil dihapus.');
+        setGeminiApiKey('');
+        fetchKeyStatus();
+      } else {
+        if (showToast) showToast(res.message || 'Gagal menghapus key.', 'error');
+      }
+    } catch (e) {
+      if (showToast) showToast('Gagal menghubungi server.', 'error');
+    }
+  };
+
   const handleTestKey = async () => {
     setGeminiTesting(true);
     try {
-      const res = await apiTestGeminiKey();
+      const keyToTest = geminiApiKey.trim() || null;
+      const res = await apiTestGeminiKey(keyToTest);
       if (res.success) {
-        if (showToast) showToast('Koneksi Google Gemini berhasil!');
+        if (showToast) showToast(res.message || 'Koneksi Gemini AI Berhasil!', 'success');
+        if (geminiApiKey.trim()) {
+          fetchKeyStatus();
+        }
       } else {
-        if (showToast) showToast(res.message || 'Koneksi Gemini gagal.', 'error');
+        if (showToast) showToast(res.message || 'Gagal menghubungkan ke Gemini.', 'error');
       }
     } catch (e) {
-      if (showToast) showToast('Gagal menguji koneksi.', 'error');
+      if (showToast) showToast('Gagal menghubungi endpoint tes server.', 'error');
     } finally {
       setGeminiTesting(false);
     }
   };
 
   const handleSendPrompt = async (presetText = null) => {
-    const textToSend = presetText || promptInput;
-    if (!textToSend.trim() || geminiLoading) return;
+    const textToSend = presetText || promptInput.trim();
+    if (!textToSend || geminiLoading) return;
 
     const userMessage = {
       role: 'user',
-      text: textToSend.trim(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      text: textToSend,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })
     };
 
     setConversation(prev => [...prev, userMessage]);
     if (!presetText) setPromptInput('');
     setGeminiLoading(true);
 
-    try {
-      const res = await apiGeminiPrompt(userMessage.text, includeContext);
-      const replyTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const historyPayload = conversation
+      .filter(m => !m.isError && m !== initialGreeting)
+      .map(m => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        text: m.text
+      }));
 
-      if (res.success && res.data && res.data.response) {
-        setConversation(prev => [...prev, {
-          role: 'model',
-          text: res.data.response,
-          time: replyTime
-        }]);
+    try {
+      const res = await apiGeminiPrompt({
+        prompt: userMessage.text,
+        include_context: includeContext,
+        conversation_history: historyPayload,
+        session_id: activeSessionId
+      });
+      const replyTime = res.data?.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const replyDate = res.data?.date || new Date().toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+      const replyText = res.data?.reply || res.data?.response || res.reply;
+
+      if (res.success && replyText) {
+        // If this was a new session without an activeSessionId, update session state
+        if (!activeSessionId && res.data?.session_id) {
+          setActiveSessionId(res.data.session_id);
+          setActiveSessionTitle(res.data.session_title || userMessage.text.slice(0, 45));
+          fetchSessions(false);
+        } else {
+          // Re-order current active session to top
+          setSessions(prev => {
+            const idx = prev.findIndex(s => s.session_id === activeSessionId);
+            if (idx >= 0) {
+              const current = { ...prev[idx], updated_at: new Date().toISOString() };
+              const filtered = prev.filter((_, i) => i !== idx);
+              return [current, ...filtered];
+            }
+            return prev;
+          });
+        }
+
+        setConversation(prev => {
+          const updated = [...prev];
+          if (res.data?.user_message_id && updated.length >= 1) {
+            const lastIdx = updated.length - 1;
+            if (updated[lastIdx].role === 'user') {
+              updated[lastIdx] = { 
+                ...updated[lastIdx], 
+                id: res.data.user_message_id, 
+                isFromDb: true 
+              };
+            }
+          }
+          updated.push({
+            id: res.data?.model_message_id,
+            role: 'model',
+            text: replyText,
+            time: replyTime,
+            date: replyDate,
+            model: res.data?.model_used,
+            isFromDb: true
+          });
+          return updated;
+        });
       } else {
         setConversation(prev => [...prev, {
           role: 'model',
-          text: (res.message || 'Gagal memproses prompt.'),
+          text: res.message || 'Gagal memproses prompt ke Gemini.',
           time: replyTime,
           isError: true
         }]);
@@ -170,7 +371,7 @@ export default function FilamentAiTracker({
     } catch (e) {
       setConversation(prev => [...prev, {
         role: 'model',
-        text: 'Terjadi kesalahan jaringan.',
+        text: 'Terjadi kesalahan jaringan atau server saat memanggil Gemini AI.',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isError: true
       }]);
@@ -182,686 +383,497 @@ export default function FilamentAiTracker({
   const handleCopyText = (txt) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(txt);
-      if (showToast) showToast('Jawaban AI disalin!');
+      if (showToast) showToast('Jawaban AI disalin ke clipboard!');
     }
   };
 
-  const handleSelectProject = async (id) => {
-    setSelectedProjectId(id);
-    if (!id) {
-      setProjectAudit(null);
+  const handleDeleteMessage = async (msgId, index) => {
+    if (!msgId) {
+      setConversation(prev => prev.filter((_, i) => i !== index));
       return;
     }
-    setProjectLoading(true);
     try {
-      const res = await apiGetAiProjectAnalysis(id);
+      const res = await apiDeleteGeminiMessage(msgId);
       if (res.success) {
-        setProjectAudit(res.data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setProjectLoading(false);
-    }
-  };
-
-  const handleRunSim = async (e) => {
-    e.preventDefault();
-    if (!simForm.project_id || !simForm.amount || parseFloat(simForm.amount) <= 0) {
-      if (showToast) showToast('Pilih proyek dan masukkan nominal simulasi (> 0).', 'error');
-      return;
-    }
-    setSimLoading(true);
-    try {
-      const res = await apiValidatePayment(simForm);
-      if (res.success) {
-        setSimResult(res.data);
+        setConversation(prev => prev.filter(m => m.id !== msgId));
+        if (showToast) showToast('Pesan berhasil dihapus dari database.');
       } else {
-        if (showToast) showToast(res.message, 'error');
+        if (showToast) showToast(res.message || 'Gagal menghapus pesan.', 'error');
       }
     } catch (e) {
-      if (showToast) showToast('Gagal menjalankan simulasi.', 'error');
-    } finally {
-      setSimLoading(false);
+      if (showToast) showToast('Gagal menghubungi server.', 'error');
     }
   };
 
-  const handleApplySim = () => {
-    if (!simForm.project_id) return;
-    const p = projects.find(item => item.project_id == simForm.project_id);
-    if (!p) return;
-    if (simForm.type === 'CLIENT_PAYMENT' && onOpenPayment) {
-      onOpenPayment(p);
-    } else if (onOpenDetail) {
-      onOpenDetail(p);
-    }
-    if (showToast) showToast('Hasil simulasi diterapkan.');
-  };
-
-  const filteredAnomalies = () => {
-    if (!aiData || !aiData.anomalies) return [];
-    if (issueFilter === 'all') return aiData.anomalies;
-    return aiData.anomalies.filter(a => a.severity === issueFilter);
-  };
+  // Filter sessions by search keyword
+  const filteredSessions = sessions.filter(s => {
+    if (!historySearch.trim()) return true;
+    return (s.title || '').toLowerCase().includes(historySearch.toLowerCase());
+  });
 
   return (
     <div className="space-y-4">
       
-      {/* 1. Header Banner: Clean Minimalist SaaS */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-              AI Payment Tracker & Audit
-            </h2>
-            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              AUDIT ENGINE
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Deteksi dini anomali kas, risiko defisit, duplikasi input, dan audit kepatuhan termin pembayaran.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={fetchAiData} 
-            disabled={loading}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-2xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Perbarui Audit</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Pill Segmented Tabs */}
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-xs overflow-x-auto scrollbar-none">
-        {[
-          { id: 'summary', label: 'Ringkasan Audit', badge: aiData?.counts?.total_anomalies },
-          { id: 'project', label: 'Audit per Proyek' },
-          { id: 'simulator', label: 'Simulator Transaksi' },
-          { id: 'gemini', label: 'Asisten AI Gemini', hasDot: hasKey }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-2 px-3 rounded-lg font-semibold transition whitespace-nowrap flex items-center justify-center gap-2 ${
-              activeTab === tab.id
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <span>{tab.label}</span>
-            {tab.badge > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500 text-white font-mono">
-                {tab.badge}
-              </span>
-            )}
-            {tab.hasDot && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* ============================================================= */}
-      {/* TAB 1: SUMMARY & ANOMALIES                                    */}
-      {/* ============================================================= */}
-      {activeTab === 'summary' && (
-        <div className="space-y-4">
-          
-          {/* Executive Narration Callout */}
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                Ringkasan Analisis Finansial AI
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono">
-                {aiData?.analyzed_at || ''}
+      {/* 1. Header Banner (Compact by Default or Expandable) */}
+      {!headerCollapsed ? (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs transition-all">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center font-bold">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                Asisten AI Gemini
+              </h2>
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                INTELLIGENT AI
               </span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-              {aiData?.executive_narration?.replace(/\*\*(.*?)\*\*/g, '$1') || 'Memuat analisis keuangan AI...'}
+            <p className="text-xs text-slate-400 mt-1">
+              Konsultasi cerdas analisis risiko arus kas, rekomendasi prioritas penagihan termin, dan draf pesan WhatsApp via Google Gemini AI.
             </p>
           </div>
 
-          {/* 4 KPI Cards: Pure White Minimalist */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            {/* Card 1: Skor Integritas */}
-            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition">
-              <span className="text-[11px] uppercase font-semibold text-slate-500 dark:text-slate-400 block mb-2">
-                Skor Integritas Sistem
-              </span>
-              <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white tracking-tight mb-2">
-                {aiData ? `${aiData.system_health_score}/100` : '—'}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {hasKey ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 text-xs font-semibold border border-emerald-200/80 dark:border-emerald-800">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Gemini Siap</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                <span className={`w-2 h-2 rounded-full ${aiData?.risk_tier === 'CRITICAL' ? 'bg-rose-500' : (aiData?.risk_tier === 'MEDIUM' ? 'bg-amber-500' : 'bg-emerald-500')} shrink-0`}></span>
-                <span>{aiData?.risk_badge_text || 'Status Normal'}</span>
-              </div>
-            </div>
-
-            {/* Card 2: Anomali Kritis */}
-            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition">
-              <span className="text-[11px] uppercase font-semibold text-slate-500 dark:text-slate-400 block mb-2">
-                Anomali Kritis
-              </span>
-              <div className="text-2xl font-bold font-mono text-rose-600 dark:text-rose-400 tracking-tight mb-2">
-                {aiData?.counts?.critical || 0}
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
-                <span>Defisit kas & overpayment</span>
-              </div>
-            </div>
-
-            {/* Card 3: Peringatan */}
-            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition">
-              <span className="text-[11px] uppercase font-semibold text-slate-500 dark:text-slate-400 block mb-2">
-                Peringatan Sistem
-              </span>
-              <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white tracking-tight mb-2">
-                {aiData?.counts?.warning || 0}
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                <span>Potensi duplikasi / deadline</span>
-              </div>
-            </div>
-
-            {/* Card 4: Proyek Bersih */}
-            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition">
-              <span className="text-[11px] uppercase font-semibold text-slate-500 dark:text-slate-400 block mb-2">
-                Proyek Bersih
-              </span>
-              <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white tracking-tight mb-2">
-                {aiData?.counts ? `${aiData.counts.clean_projects}/${aiData.counts.total_projects}` : '—'}
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                <span>100% tervalidasi aman</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Filter Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              Daftar Temuan Kesalahan & Anomali ({filteredAnomalies().length})
-            </h3>
-
-            <div className="flex items-center gap-1.5 text-xs">
-              {[
-                { id: 'all', label: 'Semua' },
-                { id: 'CRITICAL', label: 'Kritis' },
-                { id: 'WARNING', label: 'Peringatan' },
-                { id: 'INFO', label: 'Rekomendasi' }
-              ].map(f => (
-                <button 
-                  key={f.id}
-                  onClick={() => setIssueFilter(f.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    issueFilter === f.id 
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs' 
-                      : 'bg-slate-100 text-slate-600 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Anomaly Cards List */}
-          <div className="space-y-3">
-            {filteredAnomalies().map((item) => (
-              <div 
-                key={item.id}
-                className={`p-5 rounded-2xl border transition bg-white dark:bg-slate-900 ${
-                  item.severity === 'CRITICAL' 
-                    ? 'border-rose-200 dark:border-rose-900' 
-                    : item.severity === 'WARNING' 
-                    ? 'border-amber-200 dark:border-amber-900' 
-                    : 'border-slate-200 dark:border-slate-800'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-2">
-                  <div>
-                    <span className="font-mono text-[10px] text-slate-400 uppercase">
-                      Proyek: {item.project_name} ({item.client_name})
-                    </span>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                      {item.title}
-                    </h4>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider self-start ${
-                    item.severity === 'CRITICAL' 
-                      ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300' 
-                      : item.severity === 'WARNING' 
-                      ? 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300' 
-                      : 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                  }`}>
-                    {item.severity}
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-3">
-                  {item.description}
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800 text-xs mb-3">
-                  <div>
-                    <span className="font-semibold text-slate-400 block text-[10px] uppercase">Dampak Finansial:</span>
-                    <span className="text-slate-700 dark:text-slate-300">{item.impact}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-400 block text-[10px] uppercase">Rekomendasi AI:</span>
-                    <span className="text-slate-700 dark:text-slate-300">{item.solution}</span>
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <button 
-                    onClick={() => {
-                      const p = projects.find(x => x.project_id == item.project_id);
-                      if (!p) return;
-                      if (item.action_type === 'OPEN_WA' && onOpenWhatsApp) onOpenWhatsApp(p);
-                      else if (item.action_type === 'OPEN_TEAM' && onOpenDetail) onOpenDetail(p);
-                      else if (onOpenDetail) onOpenDetail(p);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 shadow-xs transition active:scale-95 cursor-pointer"
-                  >
-                    <span>{item.action_label}</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            {filteredAnomalies().length === 0 && (
-              <div className="text-center py-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-6">
-                <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2 opacity-80" />
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Tidak ada anomali terdeteksi</h4>
-                <p className="text-xs text-slate-400 mt-1">Seluruh transaksi pembukuan memenuhi standar kepatuhan kas.</p>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 text-xs font-semibold border border-amber-200/80 dark:border-amber-800">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span>Kunci API Diperlukan</span>
               </div>
             )}
-          </div>
-        </div>
-      )}
 
-      {/* ============================================================= */}
-      {/* TAB 2: AUDIT PER PROYEK                                       */}
-      {/* ============================================================= */}
-      {activeTab === 'project' && (
-        <div className="space-y-4">
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-              Pilih Proyek:
-            </label>
-            <select
-              value={selectedProjectId}
-              onChange={(e) => handleSelectProject(e.target.value)}
-              className="w-full text-xs font-semibold border rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none"
+            {/* DB Persistent indicator */}
+            <div 
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs font-semibold border border-slate-200 dark:border-slate-700" 
+              title="Setiap obrolan otomatis tersimpan di database"
             >
-              <option value="">-- Pilih Proyek yang Ingin Diaudit --</option>
-              {projects.map(p => (
-                <option key={p.project_id} value={p.project_id}>
-                  {p.project_name} • Klien: {p.client_name}
-                </option>
-              ))}
-            </select>
+              <Database className="w-3.5 h-3.5 text-blue-500" />
+              <span>DB Tersimpan</span>
+              {sessions.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 font-bold">
+                  {sessions.length} Sesi
+                </span>
+              )}
+            </div>
+
+            {/* Toggle Hide/Show Key Card Button */}
+            <button
+              onClick={toggleShowKeyCard}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-2xs transition active:scale-95 cursor-pointer ${
+                showKeyCard
+                  ? 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
+              }`}
+              title={showKeyCard ? "Sembunyikan Pengaturan API Key" : "Tampilkan Pengaturan API Key"}
+            >
+              <Key className="w-3.5 h-3.5" />
+              <span>{showKeyCard ? 'Tutup Key' : 'Atur Key'}</span>
+              {showKeyCard ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Minimize Banner Button */}
+            <button
+              onClick={toggleHeaderCollapsed}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
+              title="Ciutkan Header Banner"
+            >
+              <span>Ciutkan</span>
+              <ChevronUp className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Collapsed / Compact Header Banner */
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs transition-all">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-6 h-6 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center font-bold text-xs shrink-0">
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+            <span className="font-bold text-xs text-slate-900 dark:text-white truncate">
+              Asisten AI Gemini
+            </span>
+            <span className="hidden sm:inline-block px-1.5 py-0.2 rounded text-[9px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              INTELLIGENT AI
+            </span>
+            {hasKey ? (
+              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold ml-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="hidden md:inline">Gemini Siap</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold ml-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span className="hidden md:inline">Kunci API Diperlukan</span>
+              </span>
+            )}
           </div>
 
-          {projectAudit && projectAudit.project && (
-            <div className="space-y-4">
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    {projectAudit.project.project_name}
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Klien: {projectAudit.project.client_name} • Kontak: {projectAudit.project.client_phone || 'Belum diisi'}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 block">Skor Kepatuhan</span>
-                  <span className="text-xl font-bold font-mono text-slate-900 dark:text-white">
-                    {projectAudit.audit ? `${projectAudit.audit.score}/100` : '100/100'}
-                  </span>
-                </div>
-              </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={toggleShowKeyCard}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-semibold shadow-2xs transition active:scale-95 cursor-pointer ${
+                showKeyCard
+                  ? 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
+              }`}
+              title={showKeyCard ? "Sembunyikan Pengaturan API Key" : "Tampilkan Pengaturan API Key"}
+            >
+              <Key className="w-3 h-3" />
+              <span>{showKeyCard ? 'Tutup Key' : 'Atur Key'}</span>
+              {showKeyCard ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
 
-              {/* Checklist 5 Poin Keamanan */}
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-3 text-xs">
-                <h4 className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px] pb-2 border-b border-slate-100 dark:border-slate-800">
-                  Checklist 5 Poin Keamanan Finansial
-                </h4>
+            {conversation.length > 1 && (
+              <button
+                onClick={handleNewChat}
+                className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] transition cursor-pointer"
+                title="Mulai Chat Baru"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            )}
 
-                <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-600 dark:text-slate-300">1. Batas Pembayaran Klien (Overbilling Protection)</span>
-                  <span className={`font-semibold ${parseFloat(projectAudit.project.total_paid_by_client) > parseFloat(projectAudit.project.total_contract_value) ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    {parseFloat(projectAudit.project.total_paid_by_client) > parseFloat(projectAudit.project.total_contract_value) ? 'Melebihi Kontrak' : 'Sesuai Kontrak'}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-600 dark:text-slate-300">2. Saldo Kas Bersih (Anti Talangan Kas Pribadi)</span>
-                  <span className={`font-semibold ${parseFloat(projectAudit.project.net_cash_in_hand) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    {parseFloat(projectAudit.project.net_cash_in_hand) < 0 ? 'Kas Defisit (Perlu Penagihan)' : 'Kas Positif Aman'}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-600 dark:text-slate-300">3. Plafon Honor Tim vs Kontrak</span>
-                  <span className="font-semibold text-emerald-600">
-                    Margin {projectAudit.project.profit_margin_percentage}%
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-600 dark:text-slate-300">4. Integritas Duplikasi Nominal Transaksi</span>
-                  <span className={`font-semibold ${projectAudit.anomalies?.some(a => a.type.includes('DUPLICATE')) ? 'text-amber-600' : 'text-emerald-600'}`}>
-                    {projectAudit.anomalies?.some(a => a.type.includes('DUPLICATE')) ? 'Potensi Input Ganda' : 'Bersih Tervalidasi'}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-slate-600 dark:text-slate-300">5. Saluran Penagihan (No Telepon WhatsApp)</span>
-                  <span className={`font-semibold ${!projectAudit.project.client_phone ? 'text-amber-600' : 'text-emerald-600'}`}>
-                    {!projectAudit.project.client_phone ? 'No WA Belum Diisi' : 'Nomor Valid'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {!selectedProjectId && (
-            <div className="text-center py-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-6">
-              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">Pilih Proyek dari Menu Dropdown di Atas</h4>
-              <p className="text-xs text-slate-400 mt-1">Sistem akan melakukan audit 5 poin keamanan finansial secara mendalam.</p>
-            </div>
-          )}
+            <button
+              onClick={toggleHeaderCollapsed}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
+              title="Perluas Header Banner"
+            >
+              <span>Perluas</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </div>
         </div>
       )}
 
-      {/* ============================================================= */}
-      {/* TAB 3: SIMULATOR TRANSAKSI                                    */}
-      {/* ============================================================= */}
-      {activeTab === 'simulator' && (
-        <div className="space-y-4">
-          <form onSubmit={handleRunSim} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-3 text-xs">
-            <h4 className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px] mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-              Form Simulasi Transaksi Kas (What-If Analysis)
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-500 mb-1">Target Proyek *</label>
-                <select
-                  value={simForm.project_id}
-                  onChange={(e) => {
-                    setSimResult(null);
-                    setSimForm({ ...simForm, project_id: e.target.value });
-                    if (e.target.value) handleSelectProject(e.target.value);
-                  }}
-                  required
-                  className="w-full font-semibold border rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                >
-                  <option value="">-- Pilih Proyek --</option>
-                  {projects.map(p => (
-                    <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-500 mb-1">Jenis Transaksi *</label>
-                <select
-                  value={simForm.type}
-                  onChange={(e) => {
-                    setSimResult(null);
-                    setSimForm({ ...simForm, type: e.target.value });
-                  }}
-                  className="w-full font-semibold border rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                >
-                  <option value="CLIENT_PAYMENT">Pemasukan Klien (Cash-In)</option>
-                  <option value="TEAM_PAYMENT">Pencairan Honor Tim (Cash-Out)</option>
-                </select>
-              </div>
-            </div>
-
-            {simForm.type === 'TEAM_PAYMENT' && projectAudit?.team_members?.length > 0 && (
-              <div>
-                <label className="block font-semibold text-slate-500 mb-1">Pilih Anggota Tim Penerima *</label>
-                <select
-                  value={simForm.member_id}
-                  onChange={(e) => setSimForm({ ...simForm, member_id: e.target.value })}
-                  className="w-full font-semibold border rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                >
-                  <option value="">-- Pilih Rekan Tim --</option>
-                  {projectAudit.team_members.map(m => (
-                    <option key={m.id} value={m.id}>
-                      {m.member_name} ({m.member_role || 'Tim'}) - Sisa Honor: {formatRupiah(m.remaining_honor)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
+      {/* 2. Gemini API Key Setting Card (Collapsible) */}
+      {showKeyCard && (
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs transition-all animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
             <div>
-              <label className="block font-semibold text-slate-500 mb-1">Nominal Transaksi (Rp) *</label>
-              <input
-                type="number"
-                value={simForm.amount}
-                onChange={(e) => setSimForm({ ...simForm, amount: e.target.value })}
-                required
-                placeholder="Contoh: 2500000"
-                className="w-full font-bold font-mono text-sm border rounded-xl px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-              />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Key className="w-4 h-4 text-amber-500" />
+                <span>Pengaturan Google Gemini API Key</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Kunci API disimpan secara aman di database server untuk fitur asisten finansial cerdas.
+              </p>
             </div>
+            
+            <button
+              onClick={toggleShowKeyCard}
+              className="self-end sm:self-auto p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+              title="Tutup Pengaturan Key"
+            >
+              <ChevronUp className="w-4 h-4" />
+            </button>
+          </div>
 
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={simLoading}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 font-semibold text-xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
-              >
-                {simLoading ? 'Menganalisis...' : 'Jalankan Simulasi'}
-              </button>
-            </div>
-          </form>
-
-          {/* Result Card */}
-          {simResult && (
-            <div className={`p-5 rounded-2xl border transition bg-white dark:bg-slate-900 ${simResult.is_safe ? 'border-emerald-200 dark:border-emerald-800' : 'border-rose-200 dark:border-rose-800'} space-y-3 text-xs`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h4 className={`text-sm font-bold ${simResult.is_safe ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
-                    {simResult.is_safe ? 'Hasil Simulasi: Aman untuk Dieksekusi' : 'Hasil Simulasi: Risiko Terdeteksi'}
-                  </h4>
-                </div>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${simResult.is_safe ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300'}`}>
-                  {simResult.verdict}
-                </span>
-              </div>
-
-              {simResult.warnings?.map((w, i) => (
-                <div key={i} className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-medium border border-rose-200 dark:border-rose-900">
-                  {w}
-                </div>
-              ))}
-
-              {simResult.suggestions?.map((s, i) => (
-                <div key={i} className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-medium border border-emerald-200 dark:border-emerald-900">
-                  {s}
-                </div>
-              ))}
-
-              {simResult.simulated_state && (
-                <div className="grid grid-cols-2 gap-2 text-center pt-2">
-                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                    <span className="text-[10px] uppercase text-slate-400 block font-semibold">Kas di Tangan Setelah Transaksi:</span>
-                    <span className={`font-mono font-bold text-xs ${simResult.simulated_state.new_net_cash < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      {formatRupiah(simResult.simulated_state.new_net_cash)}
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                    <span className="text-[10px] uppercase text-slate-400 block font-semibold">Status Piutang / Hak Tim:</span>
-                    <span className="font-mono font-bold text-xs text-slate-900 dark:text-white">
-                      {simForm.type === 'CLIENT_PAYMENT' 
-                        ? formatRupiah(simResult.simulated_state.new_receivable)
-                        : formatRupiah(simResult.simulated_state.new_remaining_honor || 0)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end pt-2">
+          <form onSubmit={handleSaveKey} className="space-y-3">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={geminiApiKey}
+                  onChange={(e) => setGeminiApiKey(e.target.value)}
+                  placeholder={savedKeyMasked ? `Tersimpan: ${savedKeyMasked}` : 'Masukkan AIzaSy... dari Google AI Studio'}
+                  className="w-full text-xs font-mono rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none pr-10"
+                />
                 <button
                   type="button"
-                  onClick={handleApplySim}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 font-semibold text-xs transition active:scale-95 cursor-pointer"
+                  onClick={() => setShowKey(!showKey)}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                  title={showKey ? 'Sembunyikan' : 'Tampilkan'}
                 >
-                  Terapkan ke Transaksi Nyata
+                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 font-semibold text-xs transition active:scale-95 shadow-xs whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Key className="w-3.5 h-3.5" />
+                  <span>Simpan Key</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleTestKey}
+                  disabled={geminiTesting || (!geminiApiKey && !hasKey)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition active:scale-95 disabled:opacity-50 whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${geminiTesting ? 'animate-spin' : ''}`} />
+                  <span>{geminiTesting ? 'Menguji...' : 'Uji Koneksi'}</span>
+                </button>
+
+                {hasKey && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteKey}
+                    className="p-2.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold text-xs transition active:scale-95 cursor-pointer"
+                    title="Hapus API Key"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
-          )}
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-400 pt-1 gap-1">
+              <a 
+                href="https://aistudio.google.com/app/apikey" 
+                target="_blank" 
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-200 transition underline underline-offset-2"
+              >
+                <span>Dapatkan API Key gratis di Google AI Studio (aistudio.google.com)</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              {savedKeyMasked && (
+                <span className="font-mono text-[10px]">Kunci aktif: {savedKeyMasked}</span>
+              )}
+            </div>
+          </form>
         </div>
       )}
 
-      {/* ============================================================= */}
-      {/* TAB 4: TANYA AI GEMINI                                        */}
-      {/* ============================================================= */}
-      {activeTab === 'gemini' && (
-        <div className="space-y-4">
-          
-          {/* 1. Gemini API Key Setting Card: Clean Slate */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-              <div>
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white">Google Gemini API Key</h4>
-                <p className="text-[11px] text-slate-400">Kunci API tersimpan di browser & server secara aman</p>
-              </div>
+      {/* 3. Main Workspace: History Sidebar (Left) + Chat Console (Right) */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+        
+        {/* Left History Sidebar (Exact Style as Requested) */}
+        {showHistorySidebar && (
+          <aside className="w-full lg:w-72 shrink-0 bg-slate-900 text-slate-200 dark:bg-slate-950 rounded-2xl border border-slate-800/90 p-3.5 flex flex-col h-[620px] shadow-sm transition-all">
+            
+            {/* New Chat Button */}
+            <button
+              onClick={handleNewChat}
+              className="w-full mb-3 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-bold transition shadow-xs cursor-pointer border border-slate-700/80"
+              title="Mulai Sesi Obrolan Baru"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Obrolan Baru</span>
+            </button>
 
-              <div>
-                {hasKey ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    API Key Tersedia
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                    Belum Ada API Key
-                  </span>
+            {/* Header: Semua & Filter Icon */}
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800/80 px-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-200">Semua</span>
+                {sessions.length > 0 && (
+                  <span className="text-[10px] text-slate-400 font-mono">({filteredSessions.length})</span>
                 )}
               </div>
+              <button
+                onClick={() => setShowSearchInput(!showSearchInput)}
+                className={`p-1 rounded-lg transition cursor-pointer ${
+                  showSearchInput ? 'text-blue-400 bg-slate-800' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+                title="Filter / Cari Riwayat"
+              >
+                <Filter className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            <form onSubmit={handleSaveKey} className="space-y-2">
-              <div className="flex flex-col sm:flex-row items-stretch gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    value={geminiApiKey}
-                    onChange={(e) => setGeminiApiKey(e.target.value)}
-                    placeholder={savedKeyMasked ? `Tersimpan: ${savedKeyMasked}` : 'Masukkan AIzaSy... dari Google AI Studio'}
-                    className="w-full text-xs font-mono rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none pr-10"
-                  />
+            {/* Filter Search Input (Collapsible) */}
+            {showSearchInput && (
+              <div className="relative mb-2">
+                <input
+                  type="text"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  placeholder="Cari topik obrolan..."
+                  className="w-full text-xs bg-slate-800/90 text-white placeholder-slate-400 rounded-lg pl-7 pr-7 py-1.5 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  autoFocus
+                />
+                <Search className="w-3 h-3 text-slate-400 absolute left-2.5 top-2.5" />
+                {historySearch && (
                   <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 transition"
-                    title={showKey ? 'Sembunyikan' : 'Tampilkan'}
+                    onClick={() => setHistorySearch('')}
+                    className="absolute right-2 top-2 text-slate-400 hover:text-white text-xs cursor-pointer"
                   >
-                    {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    <X className="w-3 h-3" />
                   </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="submit"
-                    className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 font-semibold text-xs transition active:scale-95 shadow-xs whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Key className="w-3.5 h-3.5" />
-                    <span>Simpan Key</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleTestKey}
-                    disabled={geminiTesting || (!geminiApiKey && !hasKey)}
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-200 font-semibold text-xs transition active:scale-95 disabled:opacity-50 whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${geminiTesting ? 'animate-spin' : ''}`} />
-                    <span>{geminiTesting ? 'Menguji...' : 'Uji Koneksi'}</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                <span>Dapatkan API Key gratis di Google AI Studio (aistudio.google.com)</span>
-                {savedKeyMasked && (
-                  <span className="font-mono text-[10px]">Tersimpan: {savedKeyMasked}</span>
                 )}
               </div>
-            </form>
+            )}
+
+            {/* Sessions List */}
+            <div className="flex-1 overflow-y-auto space-y-0.5 pr-1 text-left">
+              {sessionsLoading ? (
+                <div className="flex items-center justify-center py-12 text-slate-500 text-xs gap-2">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Memuat riwayat...</span>
+                </div>
+              ) : filteredSessions.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-xs px-2">
+                  {historySearch ? 'Topik tidak ditemukan' : 'Belum ada riwayat percakapan. Mulai percakapan pertama Anda!'}
+                </div>
+              ) : (
+                filteredSessions.map((s) => {
+                  const isActive = activeSessionId === s.session_id;
+                  return (
+                    <div
+                      key={s.session_id}
+                      onClick={() => handleSelectSession(s.session_id)}
+                      className={`group relative flex items-center justify-between px-3 py-2 rounded-xl text-xs transition cursor-pointer ${
+                        isActive
+                          ? 'bg-slate-800 text-white font-semibold border border-slate-700/60 shadow-xs'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                      }`}
+                      title={s.title}
+                    >
+                      <span className="truncate flex-1 pr-2 text-left">
+                        {s.title}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSession(s.session_id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-400 text-slate-400 transition cursor-pointer"
+                        title="Hapus topik ini"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Sidebar Footer */}
+            <div className="pt-2.5 mt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 px-1">
+              <span>{sessions.length} sesi tersimpan</span>
+              {sessions.length > 0 && (
+                <button
+                  onClick={handleClearAllSessions}
+                  className="hover:text-rose-400 transition cursor-pointer"
+                  title="Hapus Semua Riwayat"
+                >
+                  Bersihkan Semua
+                </button>
+              )}
+            </div>
+          </aside>
+        )}
+
+        {/* Right Main Chat Console */}
+        <div className="flex-1 w-full space-y-3 min-w-0">
+          
+          {/* Top Bar for Chat Box: Toggle History, Session Title, New Chat */}
+          <div className="flex items-center justify-between gap-2 px-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                onClick={() => setShowHistorySidebar(!showHistorySidebar)}
+                className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
+                title={showHistorySidebar ? "Sembunyikan Sidebar Riwayat" : "Buka Sidebar Riwayat"}
+              >
+                <PanelLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">{showHistorySidebar ? 'Tutup Riwayat' : 'Riwayat Chat'}</span>
+              </button>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                {activeSessionTitle || 'Obrolan Baru'}
+              </span>
+            </div>
+
+            <button
+              onClick={handleNewChat}
+              className="lg:hidden inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-bold text-xs cursor-pointer shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Obrolan Baru</span>
+            </button>
           </div>
 
-          {/* 2. Interactive AI Consultation Chat Box */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-4 max-h-[500px] overflow-y-auto">
-            {conversation.map((msg, index) => (
-              <div 
-                key={index} 
-                className={`flex gap-3 text-xs ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`p-4 rounded-2xl max-w-2xl ${
-                  msg.role === 'user'
-                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-tr-none'
-                    : msg.isError
-                    ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-900 rounded-tl-none'
-                    : 'bg-slate-50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 rounded-tl-none'
-                }`}>
-                  <div className="flex items-center justify-between gap-3 mb-1.5 pb-1 border-b border-black/5 dark:border-white/10">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider ${msg.role === 'user' ? 'text-slate-200' : 'text-slate-600 dark:text-slate-400'}`}>
-                      {msg.role === 'user' ? 'Anda' : 'Asisten Keuangan Gemini AI'}
-                    </span>
-                    <div className="flex items-center gap-2 text-[9px] opacity-75">
-                      <span>{msg.time}</span>
-                      {msg.role === 'model' && !msg.isError && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopyText(msg.text)}
-                          className="hover:text-blue-500 transition"
-                          title="Salin Teks"
-                        >
-                          <Copy className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="whitespace-pre-wrap leading-relaxed text-xs">
-                    {msg.text}
-                  </div>
-                </div>
+          {/* Interactive AI Consultation Chat Box */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-4 h-[440px] overflow-y-auto">
+            {historyLoading ? (
+              <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
+                <RefreshCw className="w-5 h-5 animate-spin text-slate-500" />
+                <span className="text-xs font-medium">Memuat pesan percakapan...</span>
               </div>
-            ))}
+            ) : (
+              conversation.map((msg, index) => {
+                const showDateHeader = msg.date && (index === 1 || (index > 1 && conversation[index - 1]?.date !== msg.date));
+
+                return (
+                  <React.Fragment key={msg.id || index}>
+                    {showDateHeader && (
+                      <div className="flex items-center justify-center my-3">
+                        <span className="px-3 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60 shadow-2xs">
+                          {msg.date}
+                        </span>
+                      </div>
+                    )}
+                    <div 
+                      className={`flex gap-3 text-xs ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`p-4 rounded-2xl max-w-2xl relative group ${
+                        msg.role === 'user'
+                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-tr-none shadow-xs'
+                          : msg.isError
+                          ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-900 rounded-tl-none'
+                          : 'bg-slate-50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 rounded-tl-none'
+                      }`}>
+                        <div className="flex items-center justify-between gap-3 mb-1.5 pb-1 border-b border-black/5 dark:border-white/10">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${msg.role === 'user' ? 'text-slate-200 dark:text-slate-600' : 'text-slate-600 dark:text-slate-400'}`}>
+                            {msg.role === 'user' ? (msg.userName ? `Anda (${msg.userName})` : 'Anda') : 'Asisten Keuangan Gemini AI'}
+                          </span>
+                          <div className="flex items-center gap-2 text-[9px] opacity-75">
+                            <span>{msg.time}</span>
+                            {msg.role === 'model' && !msg.isError && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(msg.text)}
+                                className="hover:text-blue-500 transition cursor-pointer"
+                                title="Salin Teks"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            )}
+                            {msg.id && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMessage(msg.id, index)}
+                                className="opacity-0 group-hover:opacity-100 hover:text-rose-500 transition cursor-pointer"
+                                title="Hapus pesan ini dari database"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="whitespace-pre-wrap leading-relaxed text-xs">
+                          {msg.text}
+                        </div>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })
+            )}
 
             {geminiLoading && (
-              <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold p-2">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Gemini sedang menganalisis arus kas...</span>
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-semibold p-2">
+                <RefreshCw className="w-4 h-4 animate-spin text-slate-700 dark:text-slate-200" />
+                <span>Gemini sedang berpikir & menganalisis arus kas...</span>
               </div>
             )}
+            <div ref={chatBottomRef} />
           </div>
 
-          {/* 3. Quick Prompts Chips */}
+          {/* Quick Prompts Chips */}
           <div>
-            <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1.5">Pertanyaan Cepat:</span>
+            <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1.5">
+              Pertanyaan Cepat:
+            </span>
             <div className="flex flex-wrap gap-1.5">
               {quickPrompts.map((chip, idx) => (
                 <button
@@ -877,7 +889,7 @@ export default function FilamentAiTracker({
             </div>
           </div>
 
-          {/* 4. Prompt Input Form */}
+          {/* Prompt Input Form */}
           <form 
             onSubmit={(e) => { e.preventDefault(); handleSendPrompt(); }}
             className="space-y-2"
@@ -894,7 +906,7 @@ export default function FilamentAiTracker({
                 }}
                 rows={2}
                 placeholder="Tanyakan analisis kas, draf penagihan WA, atau risiko proyek ke Gemini AI (Enter untuk kirim)..."
-                className="w-full text-xs font-medium rounded-xl p-3 pr-24 border bg-white border-slate-200 text-slate-900 dark:bg-slate-900 dark:border-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 resize-none"
+                className="w-full text-xs font-medium rounded-xl p-3 pr-24 border bg-white border-slate-200 text-slate-900 dark:bg-slate-900 dark:border-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 resize-none shadow-2xs"
               />
               
               <button
@@ -913,16 +925,19 @@ export default function FilamentAiTracker({
                   type="checkbox"
                   checked={includeContext}
                   onChange={(e) => setIncludeContext(e.target.checked)}
-                  className="rounded text-slate-900 focus:ring-0"
+                  className="rounded text-slate-900 focus:ring-0 cursor-pointer"
                 />
-                <span>Sertakan Data Arus Kas & Portofolio Proyek Terkini dalam Prompt</span>
+                <span>Sertakan data ringkasan proyek & arus kas terkini</span>
               </label>
-              <span>Model: Google Gemini Flash</span>
+
+              <span className="hidden sm:inline text-[10px] text-slate-400">
+                Shift + Enter untuk baris baru
+              </span>
             </div>
           </form>
 
         </div>
-      )}
+      </div>
 
     </div>
   );

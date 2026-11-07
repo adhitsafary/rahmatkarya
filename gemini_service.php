@@ -114,7 +114,9 @@ class GeminiService {
         ?string $apiKey = null, 
         array $history = [], 
         bool $includeContext = true,
-        string $model = 'gemini-1.5-flash'
+        string $model = 'gemini-1.5-flash',
+        ?int $userId = null,
+        ?string $sessionId = null
     ): array {
         $key = !empty($apiKey) ? trim($apiKey) : $this->getSavedApiKey();
 
@@ -125,6 +127,27 @@ class GeminiService {
             ];
         }
 
+        // Ensure session exists or create a new session
+        $this->ensureChatHistoryTable();
+        $sessionTitle = 'Obrolan Baru';
+        if (empty($sessionId)) {
+            $sessionId = 'sess_' . bin2hex(random_bytes(8));
+            $cleanTitle = trim(preg_replace('/\s+/', ' ', $userPrompt));
+            $sessionTitle = mb_substr($cleanTitle, 0, 48) . (mb_strlen($cleanTitle) > 48 ? '...' : '');
+            $this->createChatSession($sessionTitle, $userId, $sessionId);
+        } else {
+            $stmt = $this->pdo->prepare("SELECT title FROM ai_chat_sessions WHERE session_id = ?");
+            $stmt->execute([$sessionId]);
+            $existingTitle = $stmt->fetchColumn();
+            if (!$existingTitle) {
+                $cleanTitle = trim(preg_replace('/\s+/', ' ', $userPrompt));
+                $sessionTitle = mb_substr($cleanTitle, 0, 48) . (mb_strlen($cleanTitle) > 48 ? '...' : '');
+                $this->createChatSession($sessionTitle, $userId, $sessionId);
+            } else {
+                $sessionTitle = $existingTitle;
+            }
+        }
+
         // 1. Build System Instruction with Live Cashflow Context if requested
         $systemInstruction = null;
         if ($includeContext) {
@@ -132,25 +155,53 @@ class GeminiService {
         }
 
         // 2. Format conversation contents array for Gemini API
-        $contents = [];
-
-        // Append past conversation history if provided
+        $cleanHistory = [];
         foreach ($history as $msg) {
             $role = ($msg['role'] ?? 'user') === 'assistant' ? 'model' : ($msg['role'] ?? 'user');
-            $text = trim($msg['content'] ?? ($msg['text'] ?? ''));
+            $text = trim($msg['content'] ?? ($msg['text'] ?? ($msg['message'] ?? '')));
             if (!empty($text)) {
-                $contents[] = [
+                $cleanHistory[] = [
                     'role' => $role,
-                    'parts' => [['text' => $text]]
+                    'text' => $text
                 ];
             }
         }
 
+        // Gemini API multi-turn requires the first turn to be 'user'
+        while (!empty($cleanHistory) && $cleanHistory[0]['role'] !== 'user') {
+            array_shift($cleanHistory);
+        }
+
+        // Limit past history to last 16 turns to keep payload fast and within tokens
+        if (count($cleanHistory) > 16) {
+            $cleanHistory = array_slice($cleanHistory, -16);
+            while (!empty($cleanHistory) && $cleanHistory[0]['role'] !== 'user') {
+                array_shift($cleanHistory);
+            }
+        }
+
+        $contents = [];
+        $lastRole = null;
+        foreach ($cleanHistory as $msg) {
+            if ($msg['role'] !== $lastRole) {
+                $contents[] = [
+                    'role' => $msg['role'],
+                    'parts' => [['text' => $msg['text']]]
+                ];
+                $lastRole = $msg['role'];
+            }
+        }
+
         // Append current user prompt
-        $contents[] = [
-            'role' => 'user',
-            'parts' => [['text' => $userPrompt]]
-        ];
+        if ($lastRole === 'user' && !empty($contents)) {
+            $lastIndex = count($contents) - 1;
+            $contents[$lastIndex]['parts'][] = ['text' => $userPrompt];
+        } else {
+            $contents[] = [
+                'role' => 'user',
+                'parts' => [['text' => $userPrompt]]
+            ];
+        }
 
         // 3. Call Gemini with fallback models if needed
         $models = array_unique([$model, 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash']);
@@ -159,11 +210,21 @@ class GeminiService {
         foreach ($models as $m) {
             $res = $this->callGeminiApi($key, $m, $contents, $systemInstruction, 2048);
             if ($res['success']) {
+                // Automatically save both user prompt and Gemini response to database
+                $userMsgId = $this->saveChatMessage('user', $userPrompt, $userId, $m, $sessionId);
+                $modelMsgId = $this->saveChatMessage('model', $res['reply'], $userId, $m, $sessionId);
+
                 return [
                     'success' => true,
                     'reply' => $res['reply'],
                     'model_used' => $m,
-                    'context_included' => $includeContext
+                    'context_included' => $includeContext,
+                    'session_id' => $sessionId,
+                    'session_title' => $sessionTitle,
+                    'user_message_id' => $userMsgId,
+                    'model_message_id' => $modelMsgId,
+                    'time' => date('H:i'),
+                    'date' => date('d M Y')
                 ];
             } else {
                 $lastError = $res['message'];
@@ -347,6 +408,329 @@ class GeminiService {
             ");
         } catch (Exception $e) {
             // Ignore if exists
+        }
+    }
+
+    /**
+     * Ensures the ai_chat_sessions and ai_chat_messages tables exist in the database
+     */
+    public function ensureChatHistoryTable(): void {
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS `ai_chat_sessions` (
+                    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    `session_id` VARCHAR(64) NOT NULL UNIQUE,
+                    `user_id` INT UNSIGNED NULL,
+                    `title` VARCHAR(255) NOT NULL,
+                    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX `idx_session_user` (`user_id`),
+                    INDEX `idx_session_updated` (`updated_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            ");
+
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS `ai_chat_messages` (
+                    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    `user_id` INT UNSIGNED NULL,
+                    `session_id` VARCHAR(64) NULL,
+                    `role` ENUM('user', 'model') NOT NULL,
+                    `message` LONGTEXT NOT NULL,
+                    `model` VARCHAR(50) NULL DEFAULT 'gemini-1.5-flash',
+                    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX `idx_chat_user` (`user_id`),
+                    INDEX `idx_chat_session` (`session_id`),
+                    INDEX `idx_chat_created` (`created_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            ");
+
+            $chk = $this->pdo->query("SHOW COLUMNS FROM `ai_chat_messages` LIKE 'session_id'");
+            if (!$chk->fetch()) {
+                $this->pdo->exec("ALTER TABLE `ai_chat_messages` ADD COLUMN `session_id` VARCHAR(64) NULL AFTER `user_id`, ADD INDEX `idx_chat_session` (`session_id`)");
+            }
+        } catch (Exception $e) {
+            // Ignore if exists
+        }
+    }
+
+    /**
+     * Retrieves all chat sessions
+     */
+    public function getChatSessions(?int $userId = null, string $search = ''): array {
+        $this->ensureChatHistoryTable();
+        try {
+            $sql = "
+                SELECT 
+                    s.id,
+                    s.session_id,
+                    s.user_id,
+                    s.title,
+                    s.created_at,
+                    s.updated_at,
+                    COUNT(m.id) AS message_count,
+                    DATE_FORMAT(s.updated_at, '%H:%i') AS formatted_time,
+                    DATE_FORMAT(s.updated_at, '%d %b %Y') AS formatted_date
+                FROM `ai_chat_sessions` s
+                LEFT JOIN `ai_chat_messages` m ON s.session_id = m.session_id
+            ";
+
+            $where = [];
+            $params = [];
+
+            if ($userId !== null) {
+                $where[] = " (s.user_id = ? OR s.user_id IS NULL) ";
+                $params[] = $userId;
+            }
+
+            if (!empty($search)) {
+                $where[] = " s.title LIKE ? ";
+                $params[] = '%' . $search . '%';
+            }
+
+            if (!empty($where)) {
+                $sql .= " WHERE " . implode(' AND ', $where);
+            }
+
+            $sql .= " GROUP BY s.id ORDER BY s.updated_at DESC, s.id DESC LIMIT 100 ";
+
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Retrieves messages for a specific session
+     */
+    public function getSessionMessages(string $sessionId): array {
+        $this->ensureChatHistoryTable();
+        try {
+            $sql = "
+                SELECT 
+                    m.id,
+                    m.user_id,
+                    m.session_id,
+                    u.name AS user_name,
+                    u.role AS user_role,
+                    m.role,
+                    m.message,
+                    m.model,
+                    m.created_at,
+                    DATE_FORMAT(m.created_at, '%H:%i') AS formatted_time,
+                    DATE_FORMAT(m.created_at, '%d %b %Y') AS formatted_date
+                FROM `ai_chat_messages` m
+                LEFT JOIN `users` u ON m.user_id = u.id
+                WHERE m.session_id = ?
+                ORDER BY m.id ASC
+            ";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$sessionId]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return array_map(function($r) {
+                return [
+                    'id' => (int)$r['id'],
+                    'user_id' => $r['user_id'] ? (int)$r['user_id'] : null,
+                    'session_id' => $r['session_id'],
+                    'user_name' => $r['user_name'] ?? null,
+                    'user_role' => $r['user_role'] ?? null,
+                    'role' => $r['role'],
+                    'text' => $r['message'],
+                    'message' => $r['message'],
+                    'model' => $r['model'],
+                    'time' => $r['formatted_time'] ?: date('H:i', strtotime($r['created_at'])),
+                    'date' => $r['formatted_date'] ?: date('d M Y', strtotime($r['created_at'])),
+                    'created_at' => $r['created_at']
+                ];
+            }, $rows);
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Creates or initializes a chat session
+     */
+    public function createChatSession(string $title, ?int $userId = null, ?string $sessionId = null): array {
+        $this->ensureChatHistoryTable();
+        $sessionId = $sessionId ?: ('sess_' . bin2hex(random_bytes(8)));
+        $title = trim($title) ?: 'Obrolan Baru';
+
+        try {
+            $stmt = $this->pdo->prepare("
+                INSERT INTO `ai_chat_sessions` (`session_id`, `user_id`, `title`, `created_at`, `updated_at`)
+                VALUES (?, ?, ?, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE `title` = VALUES(`title`), `updated_at` = NOW()
+            ");
+            $stmt->execute([$sessionId, $userId, $title]);
+
+            return [
+                'session_id' => $sessionId,
+                'title' => $title,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+                'message_count' => 0
+            ];
+        } catch (Exception $e) {
+            return [
+                'session_id' => $sessionId,
+                'title' => $title
+            ];
+        }
+    }
+
+    /**
+     * Deletes a chat session and all its messages
+     */
+    public function deleteChatSession(string $sessionId): bool {
+        $this->ensureChatHistoryTable();
+        try {
+            $stmt1 = $this->pdo->prepare("DELETE FROM `ai_chat_messages` WHERE `session_id` = ?");
+            $stmt1->execute([$sessionId]);
+
+            $stmt2 = $this->pdo->prepare("DELETE FROM `ai_chat_sessions` WHERE `session_id` = ?");
+            return $stmt2->execute([$sessionId]);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Updates session title
+     */
+    public function updateChatSessionTitle(string $sessionId, string $newTitle): bool {
+        $this->ensureChatHistoryTable();
+        $newTitle = trim($newTitle);
+        if (empty($newTitle)) return false;
+
+        try {
+            $stmt = $this->pdo->prepare("UPDATE `ai_chat_sessions` SET `title` = ?, `updated_at` = NOW() WHERE `session_id` = ?");
+            return $stmt->execute([$newTitle, $sessionId]);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Saves a single chat message (user prompt or AI model response) to database
+     */
+    public function saveChatMessage(string $role, string $message, ?int $userId = null, ?string $model = null, ?string $sessionId = null): int {
+        $this->ensureChatHistoryTable();
+        
+        $role = ($role === 'assistant' || $role === 'model') ? 'model' : 'user';
+        $message = trim($message);
+        if (empty($message)) return 0;
+
+        try {
+            $stmt = $this->pdo->prepare("
+                INSERT INTO `ai_chat_messages` (`user_id`, `session_id`, `role`, `message`, `model`, `created_at`)
+                VALUES (?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute([
+                $userId,
+                $sessionId,
+                $role,
+                $message,
+                $model ?: 'gemini-1.5-flash'
+            ]);
+            $insertId = (int)$this->pdo->lastInsertId();
+
+            if (!empty($sessionId)) {
+                $this->pdo->prepare("UPDATE `ai_chat_sessions` SET `updated_at` = NOW() WHERE `session_id` = ?")->execute([$sessionId]);
+            }
+
+            return $insertId;
+        } catch (Exception $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Retrieves stored chat history from database
+     */
+    public function getChatHistory(int $limit = 100, ?int $userId = null): array {
+        $this->ensureChatHistoryTable();
+
+        try {
+            $sql = "
+                SELECT 
+                    m.id,
+                    m.user_id,
+                    u.name AS user_name,
+                    u.role AS user_role,
+                    m.role,
+                    m.message,
+                    m.model,
+                    m.created_at,
+                    DATE_FORMAT(m.created_at, '%H:%i') AS formatted_time,
+                    DATE_FORMAT(m.created_at, '%d %b %Y') AS formatted_date
+                FROM `ai_chat_messages` m
+                LEFT JOIN `users` u ON m.user_id = u.id
+            ";
+
+            $params = [];
+            if ($userId !== null) {
+                $sql .= " WHERE m.user_id = ? ";
+                $params[] = $userId;
+            }
+
+            $sql .= " ORDER BY m.id ASC LIMIT " . (int)$limit;
+
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return array_map(function($r) {
+                return [
+                    'id' => (int)$r['id'],
+                    'user_id' => $r['user_id'] ? (int)$r['user_id'] : null,
+                    'user_name' => $r['user_name'] ?? null,
+                    'user_role' => $r['user_role'] ?? null,
+                    'role' => $r['role'],
+                    'text' => $r['message'],
+                    'message' => $r['message'],
+                    'model' => $r['model'],
+                    'time' => $r['formatted_time'] ?: date('H:i', strtotime($r['created_at'])),
+                    'date' => $r['formatted_date'] ?: date('d M Y', strtotime($r['created_at'])),
+                    'created_at' => $r['created_at']
+                ];
+            }, $rows);
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Clears chat history from database
+     */
+    public function clearChatHistory(?int $userId = null): bool {
+        $this->ensureChatHistoryTable();
+
+        try {
+            if ($userId !== null) {
+                $stmt = $this->pdo->prepare("DELETE FROM `ai_chat_messages` WHERE `user_id` = ?");
+                return $stmt->execute([$userId]);
+            } else {
+                return $this->pdo->exec("DELETE FROM `ai_chat_messages`") !== false;
+            }
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Deletes a single chat message by ID
+     */
+    public function deleteChatMessage(int $messageId): bool {
+        $this->ensureChatHistoryTable();
+
+        try {
+            $stmt = $this->pdo->prepare("DELETE FROM `ai_chat_messages` WHERE `id` = ?");
+            return $stmt->execute([$messageId]);
+        } catch (Exception $e) {
+            return false;
         }
     }
 }
