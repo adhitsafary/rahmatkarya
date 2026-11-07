@@ -1085,12 +1085,27 @@ try {
             try {
                 $pdo->beginTransaction();
                 // Explicit delete for child records to ensure cross-database compatibility
-                $stmtTp = $pdo->prepare("DELETE tp FROM team_payments tp INNER JOIN project_team_members ptm ON tp.project_team_member_id = ptm.id WHERE ptm.project_id = ?");
-                $stmtTp->execute([$id]);
-                $pdo->prepare("DELETE FROM project_team_members WHERE project_id = ?")->execute([$id]);
-                $pdo->prepare("DELETE FROM client_payments WHERE project_id = ?")->execute([$id]);
-                $pdo->prepare("DELETE FROM project_payment_terms WHERE project_id = ?")->execute([$id]);
-                $pdo->prepare("DELETE FROM project_revisions WHERE project_id = ?")->execute([$id]);
+                try {
+                    $stmtTp = $pdo->prepare("DELETE tp FROM team_payments tp INNER JOIN project_team_members ptm ON tp.project_team_member_id = ptm.id WHERE ptm.project_id = ?");
+                    $stmtTp->execute([$id]);
+                } catch (Exception $e) {}
+
+                try {
+                    $pdo->prepare("DELETE FROM project_team_members WHERE project_id = ?")->execute([$id]);
+                } catch (Exception $e) {}
+
+                try {
+                    $pdo->prepare("DELETE FROM client_payments WHERE project_id = ?")->execute([$id]);
+                } catch (Exception $e) {}
+
+                try {
+                    $pdo->prepare("DELETE FROM project_payment_terms WHERE project_id = ?")->execute([$id]);
+                } catch (Exception $e) {}
+
+                try {
+                    $pdo->prepare("DELETE FROM project_revisions WHERE project_id = ?")->execute([$id]);
+                } catch (Exception $e) {}
+
                 $stmt = $pdo->prepare("DELETE FROM projects WHERE id = ?");
                 $stmt->execute([$id]);
                 $pdo->commit();

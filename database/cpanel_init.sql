@@ -4,6 +4,8 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `team_payments`;
 DROP TABLE IF EXISTS `project_team_members`;
 DROP TABLE IF EXISTS `client_payments`;
+DROP TABLE IF EXISTS `project_revisions`;
+DROP TABLE IF EXISTS `project_payment_terms`;
 DROP TABLE IF EXISTS `projects`;
 DROP TABLE IF EXISTS `users`;
 
@@ -35,10 +37,57 @@ CREATE TABLE `projects` (
   `deadline_date` DATE NULL,
   `status` ENUM('ACTIVE', 'COMPLETED', 'ARCHIVED') NOT NULL DEFAULT 'ACTIVE',
   `notes` TEXT NULL,
+  `contract_number` VARCHAR(100) NULL,
+  `contract_date` DATE NULL,
+  `project_detail` TEXT NULL,
+  `client_email` VARCHAR(191) NULL,
+  `client_access_token` VARCHAR(64) NULL UNIQUE,
+  `max_revisions` INT UNSIGNED NOT NULL DEFAULT 3,
+  `current_revision` INT UNSIGNED NOT NULL DEFAULT 0,
+  `revision_deal_status` ENUM('PENDING', 'IN_REVISION', 'DEAL_APPROVED') NOT NULL DEFAULT 'PENDING',
+  `workflow_step` ENUM('KONTRAK_DP', 'PENGERJAAN', 'REVISI', 'PEMBAYARAN_AKHIR', 'DONE') NOT NULL DEFAULT 'KONTRAK_DP',
+  `progress_percent` INT UNSIGNED NOT NULL DEFAULT 0,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_project_status` (`status`),
-  INDEX `idx_project_client` (`client_name`)
+  INDEX `idx_project_client` (`client_name`),
+  INDEX `idx_project_token` (`client_access_token`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2b. Table project_payment_terms
+CREATE TABLE `project_payment_terms` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `project_id` INT UNSIGNED NOT NULL,
+  `term_name` VARCHAR(100) NOT NULL,
+  `amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  `due_date` DATE NULL,
+  `status` ENUM('PENDING', 'PAID', 'OVERDUE') NOT NULL DEFAULT 'PENDING',
+  `paid_amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  `paid_date` DATE NULL,
+  `notes` VARCHAR(255) NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_term_project` (`project_id`),
+  CONSTRAINT `fk_payment_terms_project` FOREIGN KEY (`project_id`) 
+    REFERENCES `projects` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2c. Table project_revisions
+CREATE TABLE `project_revisions` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `project_id` INT UNSIGNED NOT NULL,
+  `revision_number` INT UNSIGNED NOT NULL,
+  `title` VARCHAR(191) NOT NULL,
+  `description` TEXT NOT NULL,
+  `requested_by` VARCHAR(100) NOT NULL DEFAULT 'Client',
+  `status` ENUM('SUBMITTED', 'IN_PROGRESS', 'RESOLVED', 'DEAL_APPROVED') NOT NULL DEFAULT 'SUBMITTED',
+  `requested_date` DATE NOT NULL,
+  `deal_date` DATE NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_rev_project` (`project_id`),
+  CONSTRAINT `fk_revisions_project` FOREIGN KEY (`project_id`) 
+    REFERENCES `projects` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 3. Table client_payments
