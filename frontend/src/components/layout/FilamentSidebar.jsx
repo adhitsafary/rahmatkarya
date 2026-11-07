@@ -242,40 +242,6 @@ export default function FilamentSidebar({
           })}
         </div>
 
-        {/* Operational Status Box */}
-        {!collapsed && (
-          <div className="mx-3 mb-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 text-xs space-y-1.5">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              STATUS OPERASIONAL
-            </div>
-            <div className="flex justify-between items-center text-[11px] text-slate-600 dark:text-slate-300 font-mono">
-              <span>Buku Kas</span>
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/70 dark:border-emerald-800/60">
-                Sinkron & Aktif
-              </span>
-            </div>
-            <div className="flex justify-between items-center text-[11px] text-slate-600 dark:text-slate-300 font-mono">
-              <span>Mata Uang</span>
-              <span className="font-semibold text-slate-900 dark:text-white">IDR (Rupiah)</span>
-            </div>
-            <div className="flex justify-between items-center text-[11px] text-slate-600 dark:text-slate-300 font-mono">
-              <span>Mode Sistem</span>
-              <span className="font-semibold text-slate-900 dark:text-white">Real-time Live</span>
-            </div>
-          </div>
-        )}
-
-        {/* System Online Status Line */}
-        {!collapsed && (
-          <div className="px-4 py-1.5 flex items-center justify-between text-[11px] font-mono text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-slate-700 dark:text-slate-300 font-medium">Sistem Sinkron</span>
-            </div>
-            <span>v2.4 &bull; Live</span>
-          </div>
-        )}
-
         {/* User Profile Footer */}
         <div className={`p-2.5 border-t border-slate-100 dark:border-slate-800 ${collapsed ? 'flex justify-center' : ''}`}>
           <div className={`flex items-center gap-2.5 ${collapsed ? 'p-1 justify-center' : 'p-1.5'} rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800`}>
