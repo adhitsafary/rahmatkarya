@@ -131,7 +131,7 @@ export default function FilamentSidebar({
                   RAHMAT-KARYA
                 </h1>
                 <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">
-                  Dompet Digital & Arus Kas
+                  Management proyek
                 </p>
               </div>
             </div>
@@ -190,11 +190,6 @@ export default function FilamentSidebar({
                             <span className="truncate">{item.label}</span>
                           )}
                         </div>
-                        {!collapsed && item.tag && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/80">
-                            {item.tag}
-                          </span>
-                        )}
                       </a>
                     );
                   }
@@ -225,15 +220,6 @@ export default function FilamentSidebar({
                           <span className="truncate">{item.label}</span>
                         )}
                       </div>
-                      {!collapsed && item.tag && (
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono tracking-wider font-semibold transition ${
-                          isActive 
-                            ? 'bg-slate-800 text-slate-200 dark:bg-slate-200 dark:text-slate-900' 
-                            : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/80'
-                        }`}>
-                          {item.tag}
-                        </span>
-                      )}
                     </button>
                   );
                 })}
