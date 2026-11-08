@@ -847,8 +847,11 @@ try {
             $clientPayments = $stmtCp->fetchAll();
 
             // Prepare pre-composed message templates for WA and Email
+            $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? 80) == 443) ? 'https' : 'http';
             $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            $portalUrl = "http://{$host}/ASLI/Projectk2/client.php?token={$project['client_access_token']}";
+            $scriptDir = trim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
+            $dirPrefix = (!empty($scriptDir) && $scriptDir !== '.') ? "/{$scriptDir}" : '';
+            $portalUrl = "{$proto}://{$host}{$dirPrefix}/client.php?token={$project['client_access_token']}";
 
             $waText = "Halo Bpk/Ibu *{$project['client_name']}*,\n\n"
                     . "Berikut ringkasan update proyek Anda di Rahmat-Karya:\n"

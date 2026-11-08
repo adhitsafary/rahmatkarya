@@ -4,7 +4,11 @@
 // =====================================================================
 
 // Environment-aware Database Credentials
-$isLocal = str_contains(__DIR__, 'xampp') || str_contains(__DIR__, 'Projectk2');
+$hostHeader = $_SERVER['HTTP_HOST'] ?? '';
+$isLocalHost = str_contains($hostHeader, 'localhost') || str_contains($hostHeader, '127.0.0.1');
+$isLocalPath = str_contains(str_replace('\\', '/', __DIR__), '/xampp/') || str_contains(__DIR__, 'C:\\xampp');
+
+$isLocal = $isLocalHost || ($isLocalPath && empty($hostHeader));
 
 if ($isLocal) {
     define('DB_HOST', '127.0.0.1');
@@ -13,7 +17,7 @@ if ($isLocal) {
     define('DB_USER', 'root');
     define('DB_PASS', '');
 } else {
-    // Production cPanel: test.aditsapari.web.id
+    // Production cPanel (Sesuaikan jika nama DB/User berbeda di cPanel Anda)
     define('DB_HOST', '127.0.0.1');
     define('DB_PORT', '3306');
     define('DB_NAME', 'netdigi1_procash');
