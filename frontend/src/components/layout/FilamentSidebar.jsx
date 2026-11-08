@@ -9,7 +9,8 @@ import {
   UserCog, 
   FileText,
   SlidersHorizontal,
-  Layers
+  Layers,
+  Settings
 } from 'lucide-react';
 import { getInitials } from '../../utils/format';
 import { getEndpoint } from '../../services/api';
@@ -22,9 +23,15 @@ export default function FilamentSidebar({
   collapsed,
   setCollapsed,
   currentUser,
-  onLogout
+  onLogout,
+  appSettings
 }) {
   const isAdmin = currentUser?.role === 'ADMIN';
+
+  const companyName = appSettings?.company_name || 'RAHMAT-KARYA';
+  const companyTagline = appSettings?.company_tagline || 'Management proyek';
+  const companyLogo = appSettings?.company_logo || '';
+  const companyMonogram = getInitials(companyName) || 'RK';
 
   const navGroups = [
     {
@@ -73,6 +80,12 @@ export default function FilamentSidebar({
             label: 'Manajemen Pengguna',
             tag: 'USERS',
             icon: UserCog
+          },
+          {
+            id: 'settings',
+            label: 'Pengaturan Sistem',
+            tag: 'CONFIG',
+            icon: Settings
           }
         ] : []),
         {
@@ -111,10 +124,14 @@ export default function FilamentSidebar({
           <div className="h-14 flex items-center justify-center border-b border-slate-100 dark:border-slate-800">
             <button
               onClick={() => setCollapsed(false)}
-              className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-mono font-black text-xs flex items-center justify-center shadow-xs cursor-pointer"
+              className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-mono font-black text-xs flex items-center justify-center shadow-xs cursor-pointer overflow-hidden p-1"
               title="Perluas Sidebar"
             >
-              RK
+              {companyLogo ? (
+                <img src={companyLogo} alt={companyName} className="w-full h-full object-contain" />
+              ) : (
+                companyMonogram
+              )}
             </button>
           </div>
         ) : (
@@ -123,15 +140,21 @@ export default function FilamentSidebar({
               className="flex items-center gap-2.5 overflow-hidden cursor-pointer" 
               onClick={() => onSelectTab('dashboard')}
             >
-              <div className="w-8 h-8 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
-                RK
-              </div>
+              {companyLogo ? (
+                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-xs overflow-hidden p-0.5">
+                  <img src={companyLogo} alt={companyName} className="w-full h-full object-contain" />
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                  {companyMonogram}
+                </div>
+              )}
               <div className="min-w-0">
                 <h1 className="text-xs font-black uppercase tracking-tight text-slate-900 dark:text-white truncate">
-                  RAHMAT-KARYA
+                  {companyName}
                 </h1>
                 <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">
-                  Management proyek
+                  {companyTagline}
                 </p>
               </div>
             </div>

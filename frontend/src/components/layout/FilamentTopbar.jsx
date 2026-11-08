@@ -22,6 +22,7 @@ export default function FilamentTopbar({
     team: 'Honor Tim Subkon',
     'ai-tracker': 'Asisten AI Gemini',
     users: 'Manajemen Pengguna',
+    settings: 'Pengaturan Sistem',
     'project-detail': 'Rincian Proyek'
   };
 

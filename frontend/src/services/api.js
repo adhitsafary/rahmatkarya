@@ -313,3 +313,17 @@ export async function apiDeleteGeminiMessage(id) {
     body: JSON.stringify({ id })
   });
 }
+
+// ---------------------------------------------------------------------
+// App Settings Endpoints
+// ---------------------------------------------------------------------
+export async function apiGetAppSettings() {
+  return request(`${API_BASE}?action=get_settings`);
+}
+
+export async function apiSaveAppSettings(settings) {
+  return request(`${API_BASE}?action=save_settings`, {
+    method: 'POST',
+    body: JSON.stringify(settings)
+  });
+}

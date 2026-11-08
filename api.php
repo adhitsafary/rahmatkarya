@@ -11,7 +11,7 @@ require_once __DIR__ . '/gemini_service.php';
 
 $action = $_GET['action'] ?? '';
 $clientToken = $_GET['token'] ?? ($_POST['token'] ?? '');
-$isClientAction = in_array($action, ['client_portal_data', 'client_add_revision', 'client_approve_deal', 'client_get_projects']);
+$isClientAction = in_array($action, ['client_portal_data', 'client_add_revision', 'client_approve_deal', 'client_get_projects', 'get_settings']);
 
 // Protect API calls: Ensure user has valid active session or accessing client portal
 if (!$isClientAction) {
@@ -1543,6 +1543,103 @@ try {
             } else {
                 sendResponse(false, null, 'Gagal menghapus pesan.', 500);
             }
+            break;
+
+        // -------------------------------------------------------------
+        // 26. App Settings: Get System Settings
+        // -------------------------------------------------------------
+        case 'get_settings':
+            $stmt = $pdo->query("SELECT key_name, key_value FROM app_settings");
+            $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+            $settings = [
+                'company_name' => $rows['company_name'] ?? 'RAHMAT-KARYA',
+                'company_tagline' => $rows['company_tagline'] ?? 'Management Proyek & Digital Arus Kas',
+                'company_logo' => $rows['company_logo'] ?? '',
+                'company_phone' => $rows['company_phone'] ?? '081234567890',
+                'company_email' => $rows['company_email'] ?? 'admin@rahmatkarya.com',
+                'company_address' => $rows['company_address'] ?? 'Jl. Raya Utama No. 123, Indonesia',
+                'default_bank_name' => $rows['default_bank_name'] ?? 'Bank BCA',
+                'default_bank_account_number' => $rows['default_bank_account_number'] ?? '123-456-7890',
+                'default_bank_account_holder' => $rows['default_bank_account_holder'] ?? 'Tim Manajemen Keuangan',
+                'default_tax_percent' => $rows['default_tax_percent'] ?? '0',
+                'currency_symbol' => $rows['currency_symbol'] ?? 'Rp',
+            ];
+
+            $gemini = new GeminiService($pdo);
+            $rawKey = $gemini->getSavedApiKey();
+            $settings['has_gemini_key'] = !empty($rawKey);
+            $settings['masked_gemini_key'] = $gemini->maskApiKey($rawKey);
+
+            sendResponse(true, $settings, 'Pengaturan sistem berhasil dimuat.');
+            break;
+
+        // -------------------------------------------------------------
+        // 27. App Settings: Save System Settings
+        // -------------------------------------------------------------
+        case 'save_settings':
+            if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
+            requireCanEdit(true);
+            $data = getRequestData();
+
+            $allowedKeys = [
+                'company_name',
+                'company_tagline',
+                'company_logo',
+                'company_phone',
+                'company_email',
+                'company_address',
+                'default_bank_name',
+                'default_bank_account_number',
+                'default_bank_account_holder',
+                'default_tax_percent',
+                'currency_symbol'
+            ];
+
+            $stmt = $pdo->prepare("INSERT INTO app_settings (key_name, key_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE key_value = VALUES(key_value)");
+
+            foreach ($allowedKeys as $key) {
+                if (array_key_exists($key, $data)) {
+                    $stmt->execute([$key, trim((string)$data[$key])]);
+                }
+            }
+
+            // If gemini_api_key is explicitly updated
+            if (isset($data['gemini_api_key'])) {
+                $rawGemini = trim((string)$data['gemini_api_key']);
+                if (!empty($rawGemini) && !str_contains($rawGemini, '••••') && !str_contains($rawGemini, '****')) {
+                    $gemini = new GeminiService($pdo);
+                    $gemini->saveApiKey($rawGemini);
+                } elseif ($rawGemini === '') {
+                    $gemini = new GeminiService($pdo);
+                    $gemini->saveApiKey('');
+                }
+            }
+
+            // Return latest state
+            $stmt = $pdo->query("SELECT key_name, key_value FROM app_settings");
+            $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+            $gemini = new GeminiService($pdo);
+            $rawKey = $gemini->getSavedApiKey();
+
+            $updatedSettings = [
+                'company_name' => $rows['company_name'] ?? 'RAHMAT-KARYA',
+                'company_tagline' => $rows['company_tagline'] ?? 'Management Proyek & Digital Arus Kas',
+                'company_logo' => $rows['company_logo'] ?? '',
+                'company_phone' => $rows['company_phone'] ?? '081234567890',
+                'company_email' => $rows['company_email'] ?? 'admin@rahmatkarya.com',
+                'company_address' => $rows['company_address'] ?? 'Jl. Raya Utama No. 123, Indonesia',
+                'default_bank_name' => $rows['default_bank_name'] ?? 'Bank BCA',
+                'default_bank_account_number' => $rows['default_bank_account_number'] ?? '123-456-7890',
+                'default_bank_account_holder' => $rows['default_bank_account_holder'] ?? 'Tim Manajemen Keuangan',
+                'default_tax_percent' => $rows['default_tax_percent'] ?? '0',
+                'currency_symbol' => $rows['currency_symbol'] ?? 'Rp',
+                'has_gemini_key' => !empty($rawKey),
+                'masked_gemini_key' => $gemini->maskApiKey($rawKey)
+            ];
+
+            sendResponse(true, $updatedSettings, 'Pengaturan sistem berhasil disimpan!');
             break;
 
         default:

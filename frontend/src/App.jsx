@@ -6,7 +6,8 @@ import {
   apiGetSummary, 
   apiGetProjects, 
   apiToggleStatus, 
-  apiDeleteProject 
+  apiDeleteProject,
+  apiGetAppSettings
 } from './services/api';
 
 import FilamentSidebar from './components/layout/FilamentSidebar';
@@ -17,6 +18,7 @@ import FilamentSubkonTable from './components/dashboard/FilamentSubkonTable';
 import FilamentAiTracker from './components/dashboard/FilamentAiTracker';
 import FilamentProjectDetailPage from './components/dashboard/FilamentProjectDetailPage';
 import FilamentUserManagement from './components/users/FilamentUserManagement';
+import FilamentSettings from './components/settings/FilamentSettings';
 import FilamentLogin from './components/auth/FilamentLogin';
 import FilamentNotification from './components/common/FilamentNotification';
 
@@ -78,6 +80,22 @@ export default function App() {
 
   // Toast Notification
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [appSettings, setAppSettings] = useState(null);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await apiGetAppSettings();
+      if (res.success && res.data) {
+        setAppSettings(res.data);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -324,6 +342,7 @@ export default function App() {
         summary={summary}
         currentUser={currentUser}
         onLogout={handleLogout}
+        appSettings={appSettings}
       />
 
       {/* Main Panel Content Area */}
@@ -378,6 +397,12 @@ export default function App() {
             <FilamentUserManagement 
               currentUser={currentUser} 
               showToast={showToast} 
+            />
+          ) : activeTab === 'settings' ? (
+            <FilamentSettings
+              currentUser={currentUser}
+              showToast={showToast}
+              onSettingsUpdated={(newSettings) => setAppSettings(newSettings)}
             />
           ) : activeTab === 'ai-tracker' ? (
             <FilamentAiTracker
@@ -521,6 +546,7 @@ export default function App() {
         project={selectedProject}
         onClose={() => setWhatsAppModalOpen(false)}
         showToast={showToast}
+        appSettings={appSettings}
       />
 
       <FilamentEditProjectModal
