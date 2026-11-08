@@ -21,6 +21,7 @@ test_my_pwd.php
 !.env.example
 
 # OS / Editor
+*.zip
 .DS_Store
 Thumbs.db
 .vscode/
