@@ -1658,5 +1658,5 @@ try {
     }
     sendResponse(false, null, 'Kesalahan Database: ' . $msg, 400);
 } catch (Exception $e) {
-    sendResponse(false, null, 'Server Error: ' . $e->getMessage(), 500);
+    sendResponse(false, null, 'Kesalahan Sistem: ' . $e->getMessage(), 500);
 }

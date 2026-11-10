@@ -223,8 +223,8 @@ INSERT INTO `projects` (`id`, `project_code`, `project_name`, `client_name`, `cl
 (1, 'PRJ-2026-001', 'Proyek Jonggol', 'Klien Jonggol', '081234567890', 11000000.00, '2026-10-15', '2026-12-15', 'ACTIVE', 'Tim A (4,5jt) & Tim B (1jt); masing-masing baru DP'),
 (2, 'PRJ-2026-002', 'Brica', 'PT Brica Indonesia', '081324567891', 8000000.00, '2026-10-18', '2026-11-20', 'ACTIVE', 'Laporan analisa struktur. Sisa 2,5jt cair minggu depan'),
 (3, 'PRJ-2026-003', 'Renovasi Interior Kafe Senja', 'Bpk. Hendra Wijaya', '081987654321', 15000000.00, '2026-10-01', '2026-10-28', 'COMPLETED', 'Pekerjaan selesai 100%, semua pembayaran lunas'),
-(4, 'PRJ-2026-004', 'Aplikasi Kasir Toko Berkah', 'Ibu Ratna', '085712345678', 6500000.00, '2026-10-20', '2026-11-25', 'ACTIVE', 'Baru masuk DP 2jt. Desain UI disetujui'),
-(5, 'PRJ-2026-005', 'Branding & Social Media Kit', 'CV Maju Bersama', '087890123456', 5000000.00, '2026-10-22', '2026-11-15', 'ACTIVE', 'Pembayaran 50% masuk. Drafting konten minggu 1'),
+(4, 'PRJ-2026-004', 'Desain Ruko & Kantor 3 Lantai', 'Ibu Ratna', '085712345678', 6500000.00, '2026-10-20', '2026-11-25', 'ACTIVE', 'Baru masuk DP 2jt. Desain denah disetujui'),
+(5, 'PRJ-2026-005', 'Desain Villa Tropis Modern', 'CV Maju Bersama', '087890123456', 5000000.00, '2026-10-22', '2026-11-15', 'ACTIVE', 'Pembayaran 50% masuk. Drafting fasad minggu 1'),
 (6, 'PRJ-2026-006', 'Audit Struktur Gudang Logistik', 'PT Cipta Sarana', '082134567890', 12000000.00, '2026-09-15', '2026-10-15', 'COMPLETED', 'Laporan final sudah diserahkan');
 
 -- Seed Client Payments
@@ -241,8 +241,8 @@ INSERT INTO `project_team_members` (`id`, `project_id`, `member_name`, `member_r
 (2, 1, 'Tim B (Survey Lapangan)', 'Surveyor', '081388776655', 'Mandiri 0987654321 a.n Tim B', 1000000.00),
 (3, 2, 'Tim Analis Struktur', 'Senior Engineer', '081577665544', 'BNI 1122334455 a.n Analis', 859000.00),
 (4, 3, 'Tukang & Material Mandor Joko', 'Pelaksana Lapangan', '081666554433', 'BRI 5544332211 a.n Joko', 9000000.00),
-(5, 4, 'Budi Frontend Dev', 'React / Vue Developer', '081755443322', 'BCA 9988112233 a.n Budi', 3000000.00),
-(6, 5, 'Sari Graphic Designer', 'Visual & Brand Identity', '081844332211', 'Jenius 2233445566 a.n Sari', 2000000.00);
+(5, 4, 'Budi / Drafter CAD', 'Drafter Arsitektur & ME', '081755443322', 'BCA 9988112233 a.n Budi', 3000000.00),
+(6, 5, 'Sari / Desainer Interior', 'Desain Interior & Finishing', '081844332211', 'Jenius 2233445566 a.n Sari', 2000000.00);
 
 -- Seed Team Payments
 INSERT INTO `team_payments` (`id`, `project_team_member_id`, `amount_paid`, `payment_date`, `payment_method`, `notes`) VALUES

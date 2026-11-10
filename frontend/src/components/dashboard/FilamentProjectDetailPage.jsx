@@ -338,7 +338,7 @@ export default function FilamentProjectDetailPage({
                 required
                 value={revisionForm.title}
                 onChange={(e) => setRevisionForm({ ...revisionForm, title: e.target.value })}
-                placeholder="misal: Penyesuaian Layout Header & Form Kontak"
+                placeholder="misal: Penyesuaian Fasad Depan & Tata Letak Ruangan"
                 className="w-full rounded-xl px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
@@ -544,7 +544,7 @@ export default function FilamentProjectDetailPage({
           />
           <input
             type="text"
-            placeholder="Peran (misal: UI/UX Designer / Drafter)"
+            placeholder="Peran (misal: Arsitek / Drafter CAD / Estimator RAB)"
             value={memberForm.member_role}
             onChange={(e) => setMemberForm({ ...memberForm, member_role: e.target.value })}
             className="rounded-xl px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"

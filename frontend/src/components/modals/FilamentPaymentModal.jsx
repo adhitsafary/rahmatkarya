@@ -29,7 +29,7 @@ export default function FilamentPaymentModal({ isOpen, project, onClose, onSucce
 
   if (!isOpen || !project) return null;
 
-  const amountPaidNum = parseNumberFromDots(form.amount_paid);
+  const amountPaidNum = parseFloat(parseNumberFromDots(form.amount_paid)) || 0;
   const receivableRemaining = parseFloat(project?.client_receivable_remaining || 0);
   const isInvalidPaymentAmount = receivableRemaining > 0 && amountPaidNum > receivableRemaining;
 
@@ -37,7 +37,7 @@ export default function FilamentPaymentModal({ isOpen, project, onClose, onSucce
     e.preventDefault();
     setErrorMessage(null);
 
-    const amountPaid = parseNumberFromDots(form.amount_paid);
+    const amountPaid = parseFloat(parseNumberFromDots(form.amount_paid)) || 0;
 
     if (amountPaid <= 0) {
       setErrorMessage('Nominal pembayaran wajib lebih besar dari Rp 0.');

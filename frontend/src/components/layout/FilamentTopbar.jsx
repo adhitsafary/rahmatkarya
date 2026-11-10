@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Sun, Moon, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Menu, Sun, Moon, Plus, Search, SlidersHorizontal, X, Calculator } from 'lucide-react';
 
 export default function FilamentTopbar({
   collapsed,
@@ -11,6 +11,7 @@ export default function FilamentTopbar({
   searchQuery,
   setSearchQuery,
   onNewProject,
+  onOpenSimulator,
   canEdit = true
 }) {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -137,6 +138,17 @@ export default function FilamentTopbar({
                   </span>
                 )}
               </div>
+
+              {/* Project Simulator Button */}
+              <button
+                type="button"
+                onClick={onOpenSimulator}
+                className="inline-flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs px-2.5 sm:px-3 py-1.5 rounded-xl shadow-2xs transition cursor-pointer shrink-0"
+                title="Kalkulator & Simulasi Termin SPK"
+              >
+                <Calculator className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span className="hidden md:inline">Simulasi SPK</span>
+              </button>
 
               {/* New Project Button */}
               {canEdit ? (

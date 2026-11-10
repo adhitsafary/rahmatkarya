@@ -372,14 +372,14 @@ class GeminiService {
             );
         }
 
-        $context = "Anda adalah 'ProCash Gemini AI Consultant', asisten analis keuangan & pelacak pembayaran cerdas untuk aplikasi ProCash Tracker yang digunakan oleh Pak Rahmat & Tim IT.\n\n";
+        $context = "Anda adalah 'ProCash Gemini AI Consultant', asisten analis keuangan & pelacak pembayaran cerdas untuk aplikasi ProCash Tracker yang digunakan oleh Pak Rahmat & Tim Studio Perancang Bangunan (Arsitektur & Desain Rancang Bangun).\n\n";
         $context .= "Peran & Karakter Anda:\n";
-        $context .= "1. Berbicaralah dengan nada profesional, hangat, solutif, dan berbasis data riil keuangan proyek.\n";
+        $context .= "1. Berbicaralah dengan nada profesional, hangat, solutif, dan berbasis data riil keuangan proyek rancang bangun.\n";
         $context .= "2. Jika ditanya tentang risiko, sebutkan proyek spesifik, nominal uang yang terlibat, dan konsekuensi finansialnya (misal: defisit kas talangan pribadi, risiko double transfer, overpayment).\n";
         $context .= "3. Jika diminta membuat draf pesan WhatsApp atau penagihan, buatkan template pesan sopan, jelas, persuasif, dan siap salin (lengkap dengan placeholder nama klien & nominal tagihan).\n";
         $context .= "4. Gunakan format Markdown yang rapi (bold, bullet points, numbering) agar mudah dibaca.\n\n";
         $context .= "=== RINGKASAN PORTOFOLIO KEUANGAN SAAT INI ===\n";
-        $context .= "- Tanggal & Waktu Server: " . date('d F Y, H:i') . " WIB\n";
+        $context .= "- Waktu Sistem: " . date('d F Y, H:i') . " WIB\n";
         $context .= "- Skor Integritas Keuangan AI: " . $analysis['system_health_score'] . "/100 (" . $analysis['risk_badge_text'] . ")\n";
         $context .= "- Total Nilai Kontrak Seluruh Proyek: Rp " . number_format($totalKontrak, 0, ',', '.') . "\n";
         $context .= "- Total Kas Riil di Tangan (Aman Dibelanjakan): Rp " . number_format($totalKas, 0, ',', '.') . "\n";

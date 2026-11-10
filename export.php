@@ -341,10 +341,10 @@ function rupiah($nominal) {
                 <p>Finance & Project Control</p>
             </div>
             <div>
-                <p>Mengetahui / Rekan IT:</p>
+                <p>Mengetahui / Penanggung Jawab Desain:</p>
                 <div class="h-16"></div>
-                <p class="font-bold text-slate-800 text-sm">Tim Teknis</p>
-                <p>System Administrator</p>
+                <p class="font-bold text-slate-800 text-sm">Tim Arsitektur & Perencanaan</p>
+                <p>Principal Architect / Project Leader</p>
             </div>
         </div>
 

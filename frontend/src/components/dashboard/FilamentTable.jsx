@@ -13,6 +13,7 @@ import {
   Eye
 } from 'lucide-react';
 import { formatRupiah, calcPercent, getInitials } from '../../utils/format';
+import FilamentKanbanView from './FilamentKanbanView';
 
 // Crisp authentic WhatsApp SVG icon
 const WhatsAppIcon = ({ className = "w-3.5 h-3.5" }) => (
@@ -35,7 +36,9 @@ export default function FilamentTable({
   onOpenWhatsApp,
   onOpenEditProject,
   onDeleteProject,
-  canEdit = true
+  canEdit = true,
+  onRefresh,
+  showToast
 }) {
   const [selectedSort, setSelectedSort] = useState('default');
 
@@ -165,7 +168,7 @@ export default function FilamentTable({
             Menampilkan <strong className="text-slate-900 dark:text-white">{sortedProjects.length}</strong> dari {projects.length} Proyek
           </span>
 
-          {/* Segmented Table / Cards Switcher */}
+          {/* Segmented Table / Cards / Pipeline Switcher */}
           <div className="inline-flex items-center p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs">
             <button
               onClick={() => setViewMode('list')}
@@ -186,6 +189,16 @@ export default function FilamentTable({
               }`}
             >
               Kartu
+            </button>
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'kanban'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400'
+              }`}
+            >
+              Pipeline
             </button>
           </div>
 
@@ -518,6 +531,23 @@ export default function FilamentTable({
             );
           })}
         </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* 5. PIPELINE (KANBAN) VIEW                                         */}
+      {/* ================================================================= */}
+      {viewMode === 'kanban' && (
+        <FilamentKanbanView
+          projects={sortedProjects}
+          canEdit={canEdit}
+          onOpenDetail={onOpenDetail}
+          onOpenPayment={onOpenPayment}
+          onOpenWhatsApp={onOpenWhatsApp}
+          onOpenEditProject={onOpenEditProject}
+          onDeleteProject={onDeleteProject}
+          onRefresh={onRefresh}
+          showToast={showToast}
+        />
       )}
 
       {/* Empty State */}

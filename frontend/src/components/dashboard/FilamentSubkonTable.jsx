@@ -730,7 +730,7 @@ export default function FilamentSubkonTable({
                     type="text"
                     value={addForm.member_role}
                     onChange={(e) => setAddForm({ ...addForm, member_role: e.target.value })}
-                    placeholder="Contoh: Tukang Besi, Backend"
+                    placeholder="Contoh: Drafter Arsitektur, Tukang Besi / Struktur, ME"
                     className="w-full rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none"
                   />
                 </div>

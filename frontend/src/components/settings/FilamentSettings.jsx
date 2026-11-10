@@ -373,11 +373,11 @@ export default function FilamentSettings({ currentUser, showToast, onSettingsUpd
                   type="text"
                   value={form.company_logo.startsWith('http') ? form.company_logo : ''}
                   onChange={(e) => setForm(prev => ({ ...prev, company_logo: e.target.value }))}
-                  placeholder="https://domain-anda.com/logo.png"
+                  placeholder="https://studio-anda.com/logo.png"
                   className="w-full text-xs font-mono rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Anda juga dapat memasukkan link URL gambar langsung jika gambar sudah dihosting di server lain.
+                  Anda juga dapat memasukkan link URL gambar langsung jika gambar sudah tersimpan secara online.
                 </p>
               </div>
             </div>

@@ -13,6 +13,7 @@ import {
 import FilamentSidebar from './components/layout/FilamentSidebar';
 import FilamentTopbar from './components/layout/FilamentTopbar';
 import FilamentStatsOverview from './components/dashboard/FilamentStatsOverview';
+import FilamentCashflowAnalytics from './components/dashboard/FilamentCashflowAnalytics';
 import FilamentTable from './components/dashboard/FilamentTable';
 import FilamentSubkonTable from './components/dashboard/FilamentSubkonTable';
 import FilamentAiTracker from './components/dashboard/FilamentAiTracker';
@@ -24,6 +25,7 @@ import FilamentNotification from './components/common/FilamentNotification';
 
 // Modals
 import FilamentCreateProjectModal from './components/modals/FilamentCreateProjectModal';
+import FilamentProjectSimulatorModal from './components/modals/FilamentProjectSimulatorModal';
 import FilamentPaymentModal from './components/modals/FilamentPaymentModal';
 import FilamentWhatsAppModal from './components/modals/FilamentWhatsAppModal';
 import FilamentEditNotesModal from './components/modals/FilamentEditNotesModal';
@@ -62,6 +64,8 @@ export default function App() {
 
   // Modals state
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [simulatorModalOpen, setSimulatorModalOpen] = useState(false);
+  const [simulatorPrefill, setSimulatorPrefill] = useState(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -299,7 +303,7 @@ export default function App() {
           </div>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-xs font-mono text-slate-500 dark:text-slate-400">Memuat Digital Wallet & Arus Kas...</span>
+            <span className="text-xs font-mono text-slate-500 dark:text-slate-400">Memuat Arus Kas & Manajemen Proyek...</span>
           </div>
         </div>
       </div>
@@ -362,6 +366,7 @@ export default function App() {
           canEdit={canEdit}
           onLogout={handleLogout}
           onNewProject={() => setCreateModalOpen(true)}
+          onOpenSimulator={() => setSimulatorModalOpen(true)}
         />
 
         {/* Page Container - Tight padding and fluid width matching Image 2 */}
@@ -474,6 +479,24 @@ export default function App() {
                 activeTab={activeTab} 
               />
 
+              {/* Interactive Cashflow & Visual Analytics Hub for Ringkasan Kas */}
+              {activeTab === 'dashboard' && (
+                <FilamentCashflowAnalytics
+                  projects={projects}
+                  summary={summary}
+                  onOpenDetail={handleOpenDetail}
+                  onOpenPayment={(p) => {
+                    setSelectedProject(p);
+                    setPaymentModalOpen(true);
+                  }}
+                  onOpenWhatsApp={(p) => {
+                    setSelectedProject(p);
+                    setWhatsAppModalOpen(true);
+                  }}
+                  onOpenSimulator={() => setSimulatorModalOpen(true)}
+                />
+              )}
+
               {/* Filament Table Builder (Subkon Table for 'team', Projects Table for others) */}
               {activeTab === 'team' ? (
                 <FilamentSubkonTable
@@ -512,6 +535,8 @@ export default function App() {
                   onToggleStatus={handleToggleStatus}
                   onOpenEditProject={handleOpenEditProject}
                   onDeleteProject={handleOpenDeleteProject}
+                  onRefresh={fetchData}
+                  showToast={showToast}
                 />
               )}
             </>
@@ -525,8 +550,22 @@ export default function App() {
       {/* ================================================================= */}
       <FilamentCreateProjectModal
         isOpen={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
+        initialData={simulatorPrefill}
+        onClose={() => {
+          setCreateModalOpen(false);
+          setSimulatorPrefill(null);
+        }}
         onSuccess={fetchData}
+        showToast={showToast}
+      />
+
+      <FilamentProjectSimulatorModal
+        isOpen={simulatorModalOpen}
+        onClose={() => setSimulatorModalOpen(false)}
+        onApplyToNewProject={(prefill) => {
+          setSimulatorPrefill(prefill);
+          setCreateModalOpen(true);
+        }}
         showToast={showToast}
       />
 

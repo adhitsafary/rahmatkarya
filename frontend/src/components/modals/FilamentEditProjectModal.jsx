@@ -183,7 +183,7 @@ export default function FilamentEditProjectModal({
                 required
                 value={form.project_name}
                 onChange={(e) => setForm({ ...form, project_name: e.target.value })}
-                placeholder="misal: Aplikasi E-Commerce & POS"
+                placeholder="misal: Desain Arsitektur Rumah Tinggal 2 Lantai"
                 className="w-full rounded-xl px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -369,7 +369,7 @@ export default function FilamentEditProjectModal({
               rows="3"
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Catatan kebutuhan klien, termin, server, dll..."
+              placeholder="Catatan kebutuhan klien, termin pembayaran, spesifikasi desain, luas bangunan, dll..."
               className="w-full rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

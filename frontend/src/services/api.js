@@ -38,7 +38,7 @@ export async function request(url, options = {}) {
     const data = await response.json();
     return data;
   } catch (err) {
-    return { success: false, message: 'Gagal memproses data server: ' + err.message };
+    return { success: false, message: 'Gagal memproses data: ' + err.message };
   }
 }
 
@@ -72,7 +72,7 @@ export async function apiLogin(identifier, password, remember = false) {
     }
     return { success: false, message: 'Username atau kata sandi tidak cocok.' };
   } catch (e) {
-    return { success: false, message: 'Koneksi ke server gagal: ' + e.message };
+    return { success: false, message: 'Koneksi ke sistem gagal: ' + e.message };
   }
 }
 
@@ -169,6 +169,20 @@ export async function apiUpdateNotes(id, notes) {
   return request(`${API_BASE}?action=update_notes`, {
     method: 'POST',
     body: JSON.stringify({ id, notes })
+  });
+}
+
+export async function apiUpdateWorkflowStep(projectId, workflowStep) {
+  return request(`${API_BASE}?action=update_workflow_step`, {
+    method: 'POST',
+    body: JSON.stringify({ project_id: projectId, workflow_step: workflowStep })
+  });
+}
+
+export async function apiUpdateProgressPercent(projectId, progressPercent) {
+  return request(`${API_BASE}?action=update_progress_percent`, {
+    method: 'POST',
+    body: JSON.stringify({ project_id: projectId, progress_percent: progressPercent })
   });
 }
 

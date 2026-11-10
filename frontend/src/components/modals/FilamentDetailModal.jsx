@@ -284,14 +284,14 @@ export default function FilamentDetailModal({
               <input
                 type="text"
                 required
-                placeholder="Nama Tim (misal: Budi)"
+                placeholder="Nama Rekan / Tim (misal: Budi)"
                 value={memberForm.member_name}
                 onChange={(e) => setMemberForm({ ...memberForm, member_name: e.target.value })}
                 className="rounded-xl px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
               />
               <input
                 type="text"
-                placeholder="Peran (misal: UI Designer)"
+                placeholder="Peran (misal: Drafter Arsitektur / Ahli Struktur)"
                 value={memberForm.member_role}
                 onChange={(e) => setMemberForm({ ...memberForm, member_role: e.target.value })}
                 className="rounded-xl px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"

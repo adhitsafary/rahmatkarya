@@ -3,7 +3,7 @@ import { X, Plus, FolderPlus, AlertCircle } from 'lucide-react';
 import { apiCreateProject } from '../../services/api';
 import { formatNumberWithDots, parseNumberFromDots } from '../../utils/format';
 
-export default function FilamentCreateProjectModal({ isOpen, onClose, onSuccess, showToast }) {
+export default function FilamentCreateProjectModal({ isOpen, onClose, onSuccess, showToast, initialData = null }) {
   const modalScrollRef = useRef(null);
   const [form, setForm] = useState({
     project_name: '',
@@ -33,8 +33,8 @@ export default function FilamentCreateProjectModal({ isOpen, onClose, onSuccess,
         client_name: '',
         client_phone: '',
         client_email: '',
-        total_contract_value: '',
-        initial_dp: '',
+        total_contract_value: initialData?.total_contract_value ? formatNumberWithDots(initialData.total_contract_value) : '',
+        initial_dp: initialData?.dp_amount ? formatNumberWithDots(initialData.dp_amount) : '',
         start_date: new Date().toISOString().split('T')[0],
         deadline_date: '',
         status: 'ACTIVE',
@@ -44,20 +44,20 @@ export default function FilamentCreateProjectModal({ isOpen, onClose, onSuccess,
         notes: ''
       });
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   if (!isOpen) return null;
 
-  const totalContractNum = parseNumberFromDots(form.total_contract_value);
-  const initialDpNum = parseNumberFromDots(form.initial_dp);
+  const totalContractNum = parseFloat(parseNumberFromDots(form.total_contract_value)) || 0;
+  const initialDpNum = parseFloat(parseNumberFromDots(form.initial_dp)) || 0;
   const isInvalidDp = initialDpNum > 0 && totalContractNum > 0 && totalContractNum < initialDpNum;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    const totalContract = parseNumberFromDots(form.total_contract_value);
-    const initialDp = parseNumberFromDots(form.initial_dp);
+    const totalContract = parseFloat(parseNumberFromDots(form.total_contract_value)) || 0;
+    const initialDp = parseFloat(parseNumberFromDots(form.initial_dp)) || 0;
 
     if (!form.project_name.trim()) {
       setErrorMessage('Nama proyek wajib diisi.');
@@ -182,7 +182,7 @@ export default function FilamentCreateProjectModal({ isOpen, onClose, onSuccess,
                 required
                 value={form.project_name}
                 onChange={(e) => setForm({ ...form, project_name: e.target.value })}
-                placeholder="misal: Aplikasi E-Commerce & POS"
+                placeholder="misal: Desain Arsitektur Rumah Tinggal 2 Lantai"
                 className="w-full rounded-xl px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -385,7 +385,7 @@ export default function FilamentCreateProjectModal({ isOpen, onClose, onSuccess,
               rows="3"
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Catatan kebutuhan klien, termin, server, ruang lingkup..."
+              placeholder="Catatan kebutuhan klien, termin pembayaran, site plan/luas lahan, ruang lingkup desain..."
               className="w-full rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

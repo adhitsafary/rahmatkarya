@@ -184,7 +184,7 @@ CREATE TABLE `project_team_members` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `project_id` INT UNSIGNED NOT NULL,
   `member_name` VARCHAR(191) NOT NULL COMMENT 'Nama rekan kerja/vendor subkon',
-  `member_role` VARCHAR(100) NULL COMMENT 'Peran: UI/UX Designer, Backend, Copywriter, dll',
+  `member_role` VARCHAR(100) NULL COMMENT 'Peran: Drafter CAD, Arsitek, Estimator RAB, Ahli Struktur, ME, dll',
   `member_phone` VARCHAR(30) NULL COMMENT 'No WhatsApp anggota tim',
   `bank_account_info` VARCHAR(191) NULL COMMENT 'Rekening tujuan: BCA 123456 a.n Budi',
   `agreed_honor` DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Total honor yang disepakati untuk proyek ini',
@@ -347,37 +347,37 @@ ON DUPLICATE KEY UPDATE name=VALUES(name), password=VALUES(password), role=VALUE
 INSERT INTO `projects` 
   (`id`, `project_code`, `contract_number`, `contract_date`, `project_name`, `project_detail`, `client_name`, `client_phone`, `client_email`, `client_access_token`, `total_contract_value`, `start_date`, `deadline_date`, `max_revisions`, `current_revision`, `revision_deal_status`, `workflow_step`, `progress_percent`, `status`, `notes`)
 VALUES
-  (1, 'PRJ-2026-001', 'SPK/2026/011-JGL', '2026-11-01', 'Proyek Jonggol', 'Pembuatan arsitektur sistem informasi, dashboard analitik, dan landing page digital branding kawasan Jonggol Terpadu.', 'PT Mitra Perkasa Jonggol', '081234567890', 'mitraperkasa@jonggol.co.id', 'client-jonggol-2026', 11000000.00, '2026-11-01', '2026-12-15', 3, 1, 'IN_REVISION', 'REVISI', 65, 'ACTIVE', 'Case Jonggol: DP 25% (Rp 2.750.000), Termin 50% (Rp 5.500.000), Pelunasan 25% (Rp 2.750.000). Max 3x revisi mayor.'),
-  (2, 'PRJ-2026-002', 'SPK/2026/012-PF', '2026-10-10', 'Web Portfolio Personal', 'Landing page portfolio profesional, integrasi CMS custom, dan hosting deployment.', 'Mas Doni', '085678901234', 'doni@portfolio.id', 'client-doni-2026', 5000000.00, '2026-10-10', '2026-10-30', 2, 2, 'DEAL_APPROVED', 'DONE', 100, 'COMPLETED', 'Proyek telah deal dan lunas selesai 100%.');
+  (1, 'PRJ-2026-001', 'SPK/2026/011-JGL', '2026-11-01', 'Proyek Jonggol', 'Perancangan arsitektur desain bangunan, konsep denah 3D render, DED (Detail Engineering Design), dan site plan kawasan Jonggol Terpadu.', 'PT Mitra Perkasa Jonggol', '081234567890', 'mitraperkasa@jonggol.co.id', 'client-jonggol-2026', 11000000.00, '2026-11-01', '2026-12-15', 3, 1, 'IN_REVISION', 'REVISI', 65, 'ACTIVE', 'Case Jonggol: DP 25% (Rp 2.750.000), Termin 50% (Rp 5.500.000), Pelunasan 25% (Rp 2.750.000). Max 3x revisi mayor.'),
+  (2, 'PRJ-2026-002', 'SPK/2026/012-PF', '2026-10-10', 'Desain Rumah Modern 2 Lantai', 'Paket gambar kerja arsitektur DED, 3D visual render eksterior & interior, serta RAB konstruksi.', 'Mas Doni', '085678901234', 'doni@portfolio.id', 'client-doni-2026', 5000000.00, '2026-10-10', '2026-10-30', 2, 2, 'DEAL_APPROVED', 'DONE', 100, 'COMPLETED', 'Proyek telah deal dan lunas selesai 100%.');
 
 -- Sistem Pembayaran Manual dalam Uang (Rupiah) Proyek Jonggol
 INSERT INTO `project_payment_terms`
   (`project_id`, `term_name`, `amount`, `due_date`, `status`, `paid_amount`, `paid_date`, `notes`)
 VALUES
   (1, 'DP Awal (25%)', 2750000.00, '2026-11-01', 'PAID', 2750000.00, '2026-11-01', 'DP Awal 25% diterima tunai via transfer'),
-  (1, 'Termin Pengerjaan (50%)', 5500000.00, '2026-11-20', 'PENDING', 0.00, NULL, 'Termin pengerjaan fitur inti'),
-  (1, 'Pelunasan Akhir (25%)', 2750000.00, '2026-12-15', 'PENDING', 0.00, NULL, 'Pelunasan setelah serah terima sistem & deal final');
+  (1, 'Termin Pengerjaan (50%)', 5500000.00, '2026-11-20', 'PENDING', 0.00, NULL, 'Termin pengerjaan gambar kerja DED & 3D visualisasi'),
+  (1, 'Pelunasan Akhir (25%)', 2750000.00, '2026-12-15', 'PENDING', 0.00, NULL, 'Pelunasan setelah serah terima berkas final DED, RAB & deal revisi');
 
 -- Riwayat Revisi Proyek Jonggol
 INSERT INTO `project_revisions`
   (`project_id`, `revision_number`, `title`, `description`, `requested_by`, `status`, `requested_date`, `deal_date`)
 VALUES
-  (1, 1, 'Revisi Navigasi & Skema Warna Brand', 'Penyesuaian warna navbar menjadi biru navy fintech dan penambahan tombol CTA di hero banner sesuai feedback direksi.', 'PT Mitra Perkasa Jonggol', 'IN_PROGRESS', '2026-11-03', NULL);
+  (1, 1, 'Revisi Fasad & Layout Denah Ruangan', 'Penyesuaian fasad tampak depan lantai 2, pergeseran denah kamar utama, dan penambahan bukaan kanopi teras sesuai feedback owner.', 'PT Mitra Perkasa Jonggol', 'IN_PROGRESS', '2026-11-03', NULL);
 
 -- Realisasi Pembayaran Klien
 INSERT INTO `client_payments`
   (`project_id`, `invoice_number`, `payment_type`, `amount_paid`, `payment_date`, `payment_method`, `notes`)
 VALUES
   (1, 'INV-2026-001-DP', 'DOWN_PAYMENT', 2750000.00, '2026-11-01', 'TRANSFER_BCA', 'DP 25% Proyek Jonggol (Rp 2.750.000)'),
-  (2, 'INV-2026-002-DP', 'DOWN_PAYMENT', 2500000.00, '2026-10-10', 'TRANSFER_MANDIRI', 'DP 50% Web Portfolio'),
+  (2, 'INV-2026-002-DP', 'DOWN_PAYMENT', 2500000.00, '2026-10-10', 'TRANSFER_MANDIRI', 'DP 50% Desain Rumah'),
   (2, 'INV-2026-003-FIN', 'FULL_PAYMENT', 2500000.00, '2026-10-25', 'TRANSFER_MANDIRI', 'Pelunasan akhir 50%');
 
 -- Alokasi Tim Pendukung
 INSERT INTO `project_team_members`
   (`id`, `project_id`, `member_name`, `member_role`, `member_phone`, `bank_account_info`, `agreed_honor`)
 VALUES
-  (1, 1, 'Laras / IT Support', 'Backend & System Analyst', '081987654321', 'BCA 8820192819 a.n Laras', 3000000.00),
-  (2, 2, 'Rizky', 'Frontend Dev', '081345678901', 'Mandiri 1370019281 a.n Rizky', 1500000.00);
+  (1, 1, 'Laras / Drafter CAD', 'Drafter Arsitektur & Struktur', '081987654321', 'BCA 8820192819 a.n Laras', 3000000.00),
+  (2, 2, 'Rizky / 3D Visualizer', '3D Visualizer & Render', '081345678901', 'Mandiri 1370019281 a.n Rizky', 1500000.00);
 
 -- Pembayaran ke Tim
 INSERT INTO `team_payments`
