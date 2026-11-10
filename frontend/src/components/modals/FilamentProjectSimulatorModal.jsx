@@ -79,7 +79,7 @@ Total Nilai Kontrak : ${formatRupiah(calc.total)}
 - Setelah deal revisi disetujui, masuk ke tahapan pelunasan akhir
 
 ---------------------------------------
-_Dihitung otomatis oleh Rahmat-Karya ProCash System_`;
+_Dihitung otomatis oleh Rahmat-Karya_`;
 
     navigator.clipboard.writeText(text);
     setCopied(true);

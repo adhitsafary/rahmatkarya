@@ -8,6 +8,7 @@ require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/ai_tracker.php';
 require_once __DIR__ . '/gemini_service.php';
+require_once __DIR__ . '/notification_service.php';
 
 $action = $_GET['action'] ?? '';
 $clientToken = $_GET['token'] ?? ($_POST['token'] ?? '');
@@ -39,6 +40,103 @@ function sendResponse($success, $data = [], $message = '', $code = 200) {
         'data' => $data
     ]);
     exit;
+}
+
+/**
+ * Synchronize company logo to favicon files across all app directories
+ */
+function syncFaviconsFromLogo($companyLogo) {
+    if (empty($companyLogo)) {
+        return false;
+    }
+
+    try {
+        $raw = null;
+        if (strpos($companyLogo, 'data:image') === 0) {
+            $parts = explode(',', $companyLogo, 2);
+            if (isset($parts[1])) {
+                $raw = base64_decode($parts[1]);
+            }
+        } elseif (base64_decode($companyLogo, true) !== false) {
+            $raw = base64_decode($companyLogo);
+        }
+
+        if (!$raw) return false;
+
+        $src = @imagecreatefromstring($raw);
+        if (!$src) {
+            $src = @imagecreatefromstring($raw . "\xFF\xD9");
+        }
+        if (!$src) return false;
+
+        $w = imagesx($src);
+        $h = imagesy($src);
+        if ($w <= 0 || $h <= 0) return false;
+
+        $createSquare = function($size) use ($src, $w, $h) {
+            $thumb = imagecreatetruecolor($size, $size);
+            imagealphablending($thumb, false);
+            imagesavealpha($thumb, true);
+            $transparent = imagecolorallocatealpha($thumb, 255, 255, 255, 127);
+            imagefilledrectangle($thumb, 0, 0, $size, $size, $transparent);
+
+            $ratio = min($size / $w, $size / $h);
+            $newW = (int)round($w * $ratio);
+            $newH = (int)round($h * $ratio);
+            $dstX = (int)round(($size - $newW) / 2);
+            $dstY = (int)round(($size - $newH) / 2);
+
+            imagecopyresampled($thumb, $src, $dstX, $dstY, 0, 0, $newW, $newH, $w, $h);
+            return $thumb;
+        };
+
+        $icon32 = $createSquare(32);
+        $icon64 = $createSquare(64);
+        $icon192 = $createSquare(192);
+
+        ob_start();
+        imagepng($icon32);
+        $png32Data = ob_get_clean();
+
+        // 32x32 ICO file header
+        $icoHeader = pack('vvv', 0, 1, 1);
+        $icoEntry = pack('CCCCvvVV', 32, 32, 0, 0, 1, 32, strlen($png32Data), 22);
+        $icoData = $icoHeader . $icoEntry . $png32Data;
+
+        // SVG wrapper containing base64 PNG
+        ob_start();
+        imagepng($icon64);
+        $png64Data = ob_get_clean();
+        $b64Png64 = base64_encode($png64Data);
+        $svgContent = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">' .
+            '<image href="data:image/png;base64,' . $b64Png64 . '" width="64" height="64" />' .
+            '</svg>';
+
+        $dirs = [
+            __DIR__,
+            __DIR__ . '/panel',
+            __DIR__ . '/frontend/public',
+            __DIR__ . '/frontend/dist'
+        ];
+
+        foreach ($dirs as $dir) {
+            if (!is_dir($dir)) continue;
+            @imagepng($icon32, $dir . '/favicon-32x32.png');
+            @imagepng($icon64, $dir . '/favicon.png');
+            @imagepng($icon192, $dir . '/apple-touch-icon.png');
+            @file_put_contents($dir . '/favicon.ico', $icoData);
+            @file_put_contents($dir . '/favicon.svg', $svgContent);
+        }
+
+        @imagedestroy($icon32);
+        @imagedestroy($icon64);
+        @imagedestroy($icon192);
+        @imagedestroy($src);
+        return true;
+    } catch (\Throwable $e) {
+        error_log("Error syncing favicons: " . $e->getMessage());
+        return false;
+    }
 }
 
 try {
@@ -954,7 +1052,28 @@ try {
             ");
             $stmt->execute([$projectId, $invNumber, $paymentType, $amountPaid, $paymentDate, $paymentMethod, $notes]);
 
-            sendResponse(true, ['payment_id' => $pdo->lastInsertId()], 'Pembayaran klien berhasil dicatat!');
+            // Cek apakah pembayaran klien sudah lunas 100% dari total kontrak
+            $stmtTotalPaid = $pdo->prepare("SELECT COALESCE(SUM(amount_paid), 0) FROM client_payments WHERE project_id = ?");
+            $stmtTotalPaid->execute([$projectId]);
+            $currentTotalPaid = (float)$stmtTotalPaid->fetchColumn();
+
+            $stmtContract = $pdo->prepare("SELECT total_contract_value FROM projects WHERE id = ?");
+            $stmtContract->execute([$projectId]);
+            $contractVal = (float)$stmtContract->fetchColumn();
+
+            $isNowFullyPaid = false;
+            if ($contractVal > 0 && $currentTotalPaid >= $contractVal) {
+                // Otomatis ubah tahapan workflow menjadi DONE dan status COMPLETED jika sudah lunas
+                $stmtDone = $pdo->prepare("UPDATE projects SET workflow_step = 'DONE', status = 'COMPLETED', progress_percent = 100 WHERE id = ?");
+                $stmtDone->execute([$projectId]);
+                $isNowFullyPaid = true;
+            }
+
+            $successMsg = $isNowFullyPaid 
+                ? 'Pembayaran pelunasan berhasil dicatat & proyek otomatis berstatus Selesai (Deal)!' 
+                : 'Pembayaran klien berhasil dicatat!';
+
+            sendResponse(true, ['payment_id' => $pdo->lastInsertId(), 'is_fully_paid' => $isNowFullyPaid], $successMsg);
             break;
 
         // -------------------------------------------------------------
@@ -1567,6 +1686,9 @@ try {
                 'default_bank_account_holder' => $rows['default_bank_account_holder'] ?? 'Tim Manajemen Keuangan',
                 'default_tax_percent' => $rows['default_tax_percent'] ?? '0',
                 'currency_symbol' => $rows['currency_symbol'] ?? 'Rp',
+                'notif_auto_briefing' => $rows['notif_auto_briefing'] ?? '1',
+                'notif_upcoming_days' => $rows['notif_upcoming_days'] ?? '7',
+                'notif_desktop_enabled' => $rows['notif_desktop_enabled'] ?? '1',
             ];
 
             $gemini = new GeminiService($pdo);
@@ -1596,7 +1718,10 @@ try {
                 'default_bank_account_number',
                 'default_bank_account_holder',
                 'default_tax_percent',
-                'currency_symbol'
+                'currency_symbol',
+                'notif_auto_briefing',
+                'notif_upcoming_days',
+                'notif_desktop_enabled'
             ];
 
             $stmt = $pdo->prepare("INSERT INTO app_settings (key_name, key_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE key_value = VALUES(key_value)");
@@ -1605,6 +1730,10 @@ try {
                 if (array_key_exists($key, $data)) {
                     $stmt->execute([$key, trim((string)$data[$key])]);
                 }
+            }
+
+            if (isset($data['company_logo'])) {
+                syncFaviconsFromLogo($data['company_logo']);
             }
 
             // If gemini_api_key is explicitly updated
@@ -1638,11 +1767,45 @@ try {
                 'default_bank_account_holder' => $rows['default_bank_account_holder'] ?? 'Tim Manajemen Keuangan',
                 'default_tax_percent' => $rows['default_tax_percent'] ?? '0',
                 'currency_symbol' => $rows['currency_symbol'] ?? 'Rp',
+                'notif_auto_briefing' => $rows['notif_auto_briefing'] ?? '1',
+                'notif_upcoming_days' => $rows['notif_upcoming_days'] ?? '7',
+                'notif_desktop_enabled' => $rows['notif_desktop_enabled'] ?? '1',
                 'has_gemini_key' => !empty($rawKey),
                 'masked_gemini_key' => $gemini->maskApiKey($rawKey)
             ];
 
             sendResponse(true, $updatedSettings, 'Pengaturan sistem berhasil disimpan!');
+            break;
+
+        // -------------------------------------------------------------
+        // 28. Daily Notifications & Reminders (Penagihan, Termin, Piutang, Subkon)
+        // -------------------------------------------------------------
+        case 'daily_notifications':
+            $service = new NotificationService($pdo);
+            $user = getCurrentUser();
+            $includeDismissed = isset($_GET['include_dismissed']) && $_GET['include_dismissed'] === '1';
+            $notifs = $service->getDailyNotifications($user['id'] ?? null, $includeDismissed);
+            sendResponse(true, $notifs, 'Notifikasi dan pengingat harian berhasil dimuat.');
+            break;
+
+        case 'dismiss_notification':
+            if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
+            $data = getRequestData();
+            $notifKey = trim($data['notif_key'] ?? '');
+            if (empty($notifKey)) sendResponse(false, null, 'Parameter notif_key wajib diisi.', 422);
+
+            $service = new NotificationService($pdo);
+            $user = getCurrentUser();
+            $ok = $service->dismissNotification($notifKey, $user['id'] ?? null);
+            sendResponse($ok, null, $ok ? 'Notifikasi berhasil disembunyikan untuk hari ini.' : 'Gagal menyembunyikan notifikasi.');
+            break;
+
+        case 'clear_dismissed_notifications':
+            if ($method !== 'POST') sendResponse(false, null, 'Method Not Allowed', 405);
+            $service = new NotificationService($pdo);
+            $user = getCurrentUser();
+            $ok = $service->clearDismissedToday($user['id'] ?? null);
+            sendResponse($ok, null, 'Seluruh notifikasi hari ini berhasil dipulihkan.');
             break;
 
         default:

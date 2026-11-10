@@ -45,8 +45,32 @@ export default function FilamentSubkonTable({
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'unpaid' | 'paid'
-  const [projectFilter, setProjectFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(() => {
+    try {
+      return sessionStorage.getItem('procash_subkon_status_filter') || 'all';
+    } catch {
+      return 'all';
+    }
+  }); // 'all' | 'unpaid' | 'paid'
+  const [projectFilter, setProjectFilter] = useState(() => {
+    try {
+      return sessionStorage.getItem('procash_subkon_project_filter') || 'all';
+    } catch {
+      return 'all';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('procash_subkon_status_filter', statusFilter);
+    } catch {}
+  }, [statusFilter]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('procash_subkon_project_filter', projectFilter);
+    } catch {}
+  }, [projectFilter]);
 
   // Expanded history for subkon
   const [expandedMemberId, setExpandedMemberId] = useState(null);
@@ -419,182 +443,202 @@ export default function FilamentSubkonTable({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {filteredMembers.map((m) => {
-              const agreed = parseFloat(m.agreed_honor) || 0;
-              const paid = parseFloat(m.total_paid) || 0;
-              const remaining = parseFloat(m.remaining_honor) || 0;
-              const isPaidOff = remaining <= 0;
-              const progressPercent = agreed > 0 ? Math.min(100, Math.round((paid / agreed) * 100)) : 100;
-              const isExpanded = expandedMemberId === m.id;
-              const paymentsCount = m.payments?.length || 0;
+          <div className="overflow-x-auto">
+            {/* Desktop Column Header Bar for Exact Visual Alignment */}
+            <div className="hidden lg:flex items-center justify-between gap-4 px-4 sm:px-5 py-2.5 bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200/80 dark:border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-400 select-none">
+              <div className="w-[280px] xl:w-[320px] 2xl:w-[360px] shrink-0">
+                Rekan Kerja / Subkon & Proyek
+              </div>
+              <div className="w-[370px] xl:w-[420px] 2xl:w-[460px] shrink-0 px-1">
+                Plafon & Realisasi Honor (Rp)
+              </div>
+              <div className="w-[240px] xl:w-[260px] shrink-0 text-right">
+                Aksi Operasional
+              </div>
+            </div>
 
-              return (
-                <div 
-                  key={m.id} 
-                  className="p-4 sm:p-5 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition"
-                >
-                  
-                  {/* Top Row: Subkon Info, Project, Financials, & Actions */}
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredMembers.map((m) => {
+                const agreed = parseFloat(m.agreed_honor) || 0;
+                const paid = parseFloat(m.total_paid) || 0;
+                const remaining = parseFloat(m.remaining_honor) || 0;
+                const isPaidOff = remaining <= 0;
+                const progressPercent = agreed > 0 ? Math.min(100, Math.round((paid / agreed) * 100)) : 100;
+                const isExpanded = expandedMemberId === m.id;
+                const paymentsCount = m.payments?.length || 0;
+
+                return (
+                  <div 
+                    key={m.id} 
+                    className="p-4 sm:p-5 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition"
+                  >
                     
-                    {/* Left: Avatar & Person Profile */}
-                    <div className="flex items-start gap-3.5 min-w-0 lg:max-w-xs xl:max-w-sm">
-                      <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center font-bold text-xs shrink-0 shadow-xs mt-0.5">
-                        {getInitials(m.member_name)}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                            {m.member_name}
-                          </h4>
-                          {isPaidOff ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>Lunas</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-300">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                              <span>Belum Lunas</span>
-                            </span>
-                          )}
+                    {/* Top Row: Subkon Info, Project, Financials, & Actions */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      
+                      {/* Left: Avatar & Person Profile - Fixed width column */}
+                      <div className="w-full lg:w-[280px] xl:w-[320px] 2xl:w-[360px] shrink-0 flex items-start gap-3.5 min-w-0">
+                        <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center font-bold text-xs shrink-0 shadow-xs mt-0.5">
+                          {getInitials(m.member_name)}
                         </div>
 
-                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          <span className="font-medium text-slate-700 dark:text-slate-300">{m.member_role || 'Subkon'}</span>
-                          {m.member_phone && (
-                            <>
-                              <span>•</span>
-                              <a
-                                href={`https://wa.me/${m.member_phone.replace(/\D/g, '')}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline"
-                                title="Chat WhatsApp"
-                              >
-                                <Phone className="w-3 h-3" />
-                                <span>{m.member_phone}</span>
-                              </a>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Project name indicator */}
-                        <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-1 truncate">
-                          <Building className="w-3 h-3 shrink-0" />
-                          <span className="truncate">Proyek: <button onClick={() => onOpenDetail && onOpenDetail({ project_id: m.project_id })} className="font-semibold text-slate-700 dark:text-slate-300 hover:text-blue-600 underline cursor-pointer">{m.project_name}</button> ({m.client_name})</span>
-                        </div>
-
-                        {/* Bank info */}
-                        {m.bank_account_info && (
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono mt-1">
-                            <CreditCard className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="truncate">{m.bank_account_info}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(m.bank_account_info, 'No. Rekening')}
-                              className="text-slate-400 hover:text-slate-600 cursor-pointer"
-                              title="Salin Info Rekening"
-                            >
-                              <Copy className="w-3 h-3" />
-                            </button>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate" title={m.member_name}>
+                              {m.member_name}
+                            </h4>
+                            {isPaidOff ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Lunas</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-300 shrink-0">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                <span>Belum Lunas</span>
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
 
-                    {/* Middle: Financial Status (Plafon, Terbayar, & Sisa Honor Kebawah) */}
-                    <div className="grid grid-cols-3 gap-3 sm:gap-6 bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs">
-                      
-                      {/* Plafon Disepakati */}
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
-                          Plafon Disepakati
-                        </span>
-                        <span className="font-mono font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
-                          {formatRupiah(agreed)}
-                        </span>
-                      </div>
+                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
+                            <span className="font-medium text-slate-700 dark:text-slate-300 truncate">{m.member_role || 'Subkon'}</span>
+                            {m.member_phone && (
+                              <>
+                                <span>•</span>
+                                <a
+                                  href={`https://wa.me/${m.member_phone.replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline shrink-0"
+                                  title="Chat WhatsApp"
+                                >
+                                  <Phone className="w-3 h-3" />
+                                  <span>{m.member_phone}</span>
+                                </a>
+                              </>
+                            )}
+                          </div>
 
-                      {/* Sudah Dicairkan */}
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
-                          Sudah Dicairkan
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm">
-                            {formatRupiah(paid)}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">({progressPercent}%)</span>
+                          {/* Project name indicator */}
+                          <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-1 truncate">
+                            <Building className="w-3 h-3 shrink-0" />
+                            <span className="truncate">
+                              Proyek: <button onClick={() => onOpenDetail && onOpenDetail({ project_id: m.project_id })} className="font-semibold text-slate-700 dark:text-slate-300 hover:text-blue-600 underline cursor-pointer">{m.project_name}</button> {m.client_name ? `(${m.client_name})` : ''}
+                            </span>
+                          </div>
+
+                          {/* Bank info */}
+                          {m.bank_account_info && (
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono mt-1 truncate">
+                              <CreditCard className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="truncate">{m.bank_account_info}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(m.bank_account_info, 'No. Rekening')}
+                                className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                                title="Salin Info Rekening"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* SISA PIUTANG / HONOR SUBKON (Highlighted) */}
-                      <div>
-                        <span className="text-[10px] uppercase font-black text-rose-600 dark:text-rose-400 block mb-0.5">
-                          Sisa Honor Terbuka
-                        </span>
-                        <span className={`font-mono font-black text-xs sm:text-sm ${
-                          remaining > 0 
-                            ? 'text-rose-600 dark:text-rose-400' 
-                            : 'text-slate-400'
-                        }`}>
-                          {remaining > 0 ? formatRupiah(remaining) : 'Rp 0 (Lunas)'}
-                        </span>
+                      {/* Middle: Financial Status Card - Fixed uniform width across all rows */}
+                      <div className="w-full lg:w-[370px] xl:w-[420px] 2xl:w-[460px] shrink-0">
+                        <div className="grid grid-cols-3 gap-2 sm:gap-3 bg-slate-50 dark:bg-slate-950/60 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs w-full shadow-2xs">
+                          
+                          {/* Plafon Disepakati */}
+                          <div className="min-w-0">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5 truncate">
+                              Plafon Disepakati
+                            </span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white text-xs sm:text-sm truncate block">
+                              {formatRupiah(agreed)}
+                            </span>
+                          </div>
+
+                          {/* Sudah Dicairkan */}
+                          <div className="min-w-0">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5 truncate">
+                              Sudah Dicairkan
+                            </span>
+                            <div className="flex items-baseline gap-1 truncate">
+                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm truncate">
+                                {formatRupiah(paid)}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono shrink-0">({progressPercent}%)</span>
+                            </div>
+                          </div>
+
+                          {/* Sisa Honor Terbuka */}
+                          <div className="min-w-0">
+                            <span className={`text-[10px] uppercase font-black block mb-0.5 truncate ${
+                              remaining > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400 dark:text-slate-500'
+                            }`}>
+                              Sisa Honor Terbuka
+                            </span>
+                            <span className={`font-mono font-black text-xs sm:text-sm truncate block ${
+                              remaining > 0 
+                                ? 'text-rose-600 dark:text-rose-400' 
+                                : 'text-slate-400 dark:text-slate-500'
+                            }`}>
+                              {remaining > 0 ? formatRupiah(remaining) : 'Rp 0 (Lunas)'}
+                            </span>
+                          </div>
+
+                        </div>
+                      </div>
+
+                      {/* Right: Action Buttons - Aligned cleanly to the right edge */}
+                      <div className="w-full lg:w-[240px] xl:w-[260px] flex items-center justify-start lg:justify-end gap-1.5 sm:gap-2 shrink-0">
+                        
+                        {/* Cairkan Honor Button */}
+                        {canEdit && (
+                          <button
+                            onClick={() => handleOpenPay(m)}
+                            className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap min-w-[110px] ${
+                              remaining > 0
+                                ? 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            }`}
+                            title="Cairkan Honor ke Subkon"
+                          >
+                            <Wallet className="w-3.5 h-3.5" />
+                            <span>{remaining > 0 ? 'Cairkan Honor' : '+ Tambah Bayar'}</span>
+                          </button>
+                        )}
+
+                        {/* Expand Payment History Button */}
+                        <button
+                          onClick={() => setExpandedMemberId(isExpanded ? null : m.id)}
+                          className={`inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl border text-xs font-semibold shadow-2xs transition active:scale-95 cursor-pointer whitespace-nowrap ${
+                            isExpanded
+                              ? 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white'
+                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+                          }`}
+                          title="Lihat Riwayat Pencairan"
+                        >
+                          <History className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Riwayat ({paymentsCount})</span>
+                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {/* Delete Subkon Button */}
+                        {canEdit && (
+                          <button
+                            onClick={() => handleDeleteMember(m)}
+                            className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-900 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer shrink-0"
+                            title="Hapus Data Subkon"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
                       </div>
 
                     </div>
-
-                    {/* Right: Action Buttons */}
-                    <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
-                      
-                      {/* Cairkan Honor Button */}
-                      {canEdit && (
-                        <button
-                          onClick={() => handleOpenPay(m)}
-                          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer ${
-                            remaining > 0
-                              ? 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                          }`}
-                          title="Cairkan Honor ke Subkon"
-                        >
-                          <Wallet className="w-3.5 h-3.5" />
-                          <span>{remaining > 0 ? 'Cairkan Honor' : '+ Tambah Bayar'}</span>
-                        </button>
-                      )}
-
-                      {/* Expand Payment History Button */}
-                      <button
-                        onClick={() => setExpandedMemberId(isExpanded ? null : m.id)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-2 rounded-xl border text-xs font-semibold shadow-2xs transition active:scale-95 cursor-pointer ${
-                          isExpanded
-                            ? 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white'
-                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
-                        }`}
-                        title="Lihat Riwayat Pencairan"
-                      >
-                        <History className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Riwayat ({paymentsCount})</span>
-                        {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                      </button>
-
-                      {/* Delete Subkon Button */}
-                      {canEdit && (
-                        <button
-                          onClick={() => handleDeleteMember(m)}
-                          className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-900 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
-                          title="Hapus Data Subkon"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-
-                    </div>
-
-                  </div>
 
                   {/* Accordion: Payment History List for this member */}
                   {isExpanded && (
@@ -654,6 +698,7 @@ export default function FilamentSubkonTable({
                 </div>
               );
             })}
+          </div>
           </div>
         )}
 

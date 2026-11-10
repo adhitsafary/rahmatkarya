@@ -7,7 +7,8 @@ import {
   apiGetProjects, 
   apiToggleStatus, 
   apiDeleteProject,
-  apiGetAppSettings
+  apiGetAppSettings,
+  apiGetDailyNotifications
 } from './services/api';
 
 import FilamentSidebar from './components/layout/FilamentSidebar';
@@ -22,15 +23,70 @@ import FilamentUserManagement from './components/users/FilamentUserManagement';
 import FilamentSettings from './components/settings/FilamentSettings';
 import FilamentLogin from './components/auth/FilamentLogin';
 import FilamentNotification from './components/common/FilamentNotification';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Modals
 import FilamentCreateProjectModal from './components/modals/FilamentCreateProjectModal';
+import FilamentDailyBriefingModal from './components/modals/FilamentDailyBriefingModal';
 import FilamentProjectSimulatorModal from './components/modals/FilamentProjectSimulatorModal';
 import FilamentPaymentModal from './components/modals/FilamentPaymentModal';
 import FilamentWhatsAppModal from './components/modals/FilamentWhatsAppModal';
 import FilamentEditNotesModal from './components/modals/FilamentEditNotesModal';
 import FilamentEditProjectModal from './components/modals/FilamentEditProjectModal';
 import FilamentDeleteConfirmModal from './components/modals/FilamentDeleteConfirmModal';
+
+const VALID_TABS = ['dashboard', 'projects', 'receivables', 'team', 'ai-tracker', 'users', 'settings'];
+
+function parseHashLocation() {
+  if (typeof window === 'undefined') return null;
+  const hash = window.location.hash.replace(/^#\/?/, '').trim();
+  if (!hash) return null;
+
+  // Check project detail pattern: project/123 or project-detail?id=123 or project-detail/123
+  const projectMatch = hash.match(/^project(?:-detail)?(?:\/|\?id=)([a-zA-Z0-9_-]+)/);
+  if (projectMatch) {
+    return {
+      tab: 'project-detail',
+      projectId: projectMatch[1]
+    };
+  }
+
+  const cleanTab = hash.split('?')[0].split('/')[0];
+  if (VALID_TABS.includes(cleanTab)) {
+    return {
+      tab: cleanTab,
+      projectId: null
+    };
+  }
+
+  return null;
+}
+
+function getInitialNavigation() {
+  const fromHash = parseHashLocation();
+  if (fromHash) {
+    return fromHash;
+  }
+
+  try {
+    const saved = localStorage.getItem('procash_active_tab');
+    if (saved) {
+      if (saved.startsWith('project:') || saved.startsWith('project/')) {
+        const pId = saved.split(/[:/]/)[1];
+        if (pId) {
+          return { tab: 'project-detail', projectId: pId };
+        }
+      }
+      if (VALID_TABS.includes(saved)) {
+        return { tab: saved, projectId: null };
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return { tab: 'dashboard', projectId: null };
+}
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -47,10 +103,19 @@ export default function App() {
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Active navigation tab & filter
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [currentFilter, setCurrentFilter] = useState('all');
+  // Active navigation tab & filter (persisted on page reload & synced with browser history)
+  const initialNav = getInitialNavigation();
+  const [activeTab, setActiveTab] = useState(initialNav.tab);
+  const [detailProjectId, setDetailProjectId] = useState(initialNav.projectId);
+  const [currentFilter, setCurrentFilter] = useState(() => {
+    if (initialNav.tab === 'receivables') return 'need_billing';
+    if (initialNav.tab === 'team') return 'need_payout';
+    return 'all';
+  });
+  const [selectedWorkflowStage, setSelectedWorkflowStage] = useState(null);
   const [viewMode, setViewMode] = useState(() => {
+    const saved = localStorage.getItem('procash_view_mode');
+    if (saved) return saved;
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       return 'grid';
     }
@@ -76,8 +141,10 @@ export default function App() {
   const [projectToEdit, setProjectToEdit] = useState(null);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [detailRefreshTrigger, setDetailRefreshTrigger] = useState(0);
-  const [detailProjectId, setDetailProjectId] = useState(null);
   const [previousTab, setPreviousTab] = useState('projects');
+
+  const [dailyBriefingOpen, setDailyBriefingOpen] = useState(false);
+  const [dailyNotifData, setDailyNotifData] = useState(null);
 
   // User permission check
   const canEdit = currentUser?.role !== 'VIEWER';
@@ -97,9 +164,99 @@ export default function App() {
     }
   };
 
+  const fetchDailyNotifs = async () => {
+    try {
+      const res = await apiGetDailyNotifications();
+      if (res.success && res.data) {
+        setDailyNotifData(res.data);
+        // Automatically open daily briefing if user hasn't seen/dismissed it today
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const dismissedToday = localStorage.getItem('procash_briefing_dismissed_date') === todayStr;
+        const autoEnabled = appSettings?.notif_auto_briefing !== '0';
+        if (!dismissedToday && autoEnabled && res.data.summary?.total_alerts > 0) {
+          setTimeout(() => {
+            setDailyBriefingOpen(true);
+          }, 900);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
   }, []);
+
+  // Dynamically sync browser tab Title and Favicon
+  useEffect(() => {
+    if (appSettings?.company_name) {
+      document.title = `${appSettings.company_name} - Arus Kas & Manajemen Proyek`;
+    }
+
+    const applyFavicon = (href, type = 'image/png') => {
+      // Remove all old icon links to force Chrome/browser tab repaint
+      const existing = document.querySelectorAll("link[rel*='icon'], link[rel='apple-touch-icon']");
+      existing.forEach(el => el.remove());
+
+      const icon = document.createElement('link');
+      icon.rel = 'icon';
+      if (type) icon.type = type;
+      icon.href = href;
+      document.head.appendChild(icon);
+
+      const shortcut = document.createElement('link');
+      shortcut.rel = 'shortcut icon';
+      if (type) shortcut.type = type;
+      shortcut.href = href;
+      document.head.appendChild(shortcut);
+
+      const apple = document.createElement('link');
+      apple.rel = 'apple-touch-icon';
+      apple.href = href;
+      document.head.appendChild(apple);
+    };
+
+    if (appSettings?.company_logo) {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 64;
+          canvas.height = 64;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, 64, 64);
+            const maxDim = Math.max(img.width, img.height);
+            const scale = 64 / maxDim;
+            const w = img.width * scale;
+            const h = img.height * scale;
+            const x = (64 - w) / 2;
+            const y = (64 - h) / 2;
+            ctx.drawImage(img, x, y, w, h);
+            const pngDataUrl = canvas.toDataURL('image/png');
+            applyFavicon(pngDataUrl, 'image/png');
+            return;
+          }
+        } catch {
+          // fallback
+        }
+        applyFavicon(appSettings.company_logo, 'image/png');
+      };
+      img.onerror = () => {
+        applyFavicon('./favicon-32x32.png?v=' + Date.now(), 'image/png');
+      };
+      img.src = appSettings.company_logo;
+    } else {
+      applyFavicon('./favicon-32x32.png?v=3', 'image/png');
+    }
+  }, [appSettings]);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchDailyNotifs();
+    }
+  }, [currentUser]);
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -163,18 +320,38 @@ export default function App() {
     } else if (tabId === 'dashboard') {
       setCurrentFilter('all');
     }
+
+    const targetHash = tabId === 'dashboard' ? '#dashboard' : `#${tabId}`;
+    try {
+      localStorage.setItem('procash_active_tab', tabId);
+    } catch (e) {}
+    if (window.location.hash !== targetHash) {
+      window.history.pushState(null, '', targetHash);
+    }
   };
 
   // Synchronized Table Filter Change
   const handleFilterChange = (filterId) => {
     setCurrentFilter(filterId);
     setDetailProjectId(null);
+    let targetTab = activeTab;
     if (filterId === 'need_billing') {
+      targetTab = 'receivables';
       setActiveTab('receivables');
     } else if (filterId === 'need_payout') {
+      targetTab = 'team';
       setActiveTab('team');
     } else if (filterId === 'all' || filterId === 'settled') {
+      targetTab = 'projects';
       setActiveTab('projects');
+    }
+
+    const targetHash = targetTab === 'dashboard' ? '#dashboard' : `#${targetTab}`;
+    try {
+      localStorage.setItem('procash_active_tab', targetTab);
+    } catch (e) {}
+    if (window.location.hash !== targetHash) {
+      window.history.pushState(null, '', targetHash);
     }
   };
 
@@ -185,7 +362,82 @@ export default function App() {
     setSelectedProject(p);
     setPreviousTab(activeTab === 'project-detail' ? 'projects' : activeTab);
     setActiveTab('project-detail');
+
+    const targetHash = `#project/${id}`;
+    try {
+      localStorage.setItem('procash_active_tab', `project/${id}`);
+    } catch (e) {}
+    if (window.location.hash !== targetHash) {
+      window.history.pushState(null, '', targetHash);
+    }
   };
+
+  // Listen to browser Back / Forward buttons (popstate & hashchange)
+  useEffect(() => {
+    const handlePopState = () => {
+      const nav = parseHashLocation();
+      if (nav) {
+        if (nav.tab === 'project-detail') {
+          setDetailProjectId(nav.projectId);
+          setActiveTab('project-detail');
+        } else {
+          setActiveTab(nav.tab);
+          setDetailProjectId(null);
+          if (nav.tab === 'receivables') {
+            setCurrentFilter('need_billing');
+          } else if (nav.tab === 'team') {
+            setCurrentFilter('need_payout');
+          } else if (nav.tab === 'projects' || nav.tab === 'dashboard') {
+            setCurrentFilter('all');
+          }
+        }
+      } else {
+        setActiveTab('dashboard');
+        setDetailProjectId(null);
+        setCurrentFilter('all');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
+  }, []);
+
+  // Sync URL hash with current view on mount / reload
+  useEffect(() => {
+    if (!authChecked || !currentUser) return;
+
+    let targetHash = '';
+    let storageVal = activeTab;
+
+    if (activeTab === 'project-detail' && detailProjectId) {
+      targetHash = `#project/${detailProjectId}`;
+      storageVal = `project/${detailProjectId}`;
+    } else if (VALID_TABS.includes(activeTab)) {
+      targetHash = activeTab === 'dashboard' ? '#dashboard' : `#${activeTab}`;
+      storageVal = activeTab;
+    }
+
+    if (targetHash) {
+      try {
+        localStorage.setItem('procash_active_tab', storageVal);
+      } catch (e) {}
+
+      if (window.location.hash !== targetHash) {
+        window.history.replaceState(null, '', targetHash);
+      }
+    }
+  }, [activeTab, detailProjectId, authChecked, currentUser]);
+
+  // Persist View Mode (grid / list)
+  useEffect(() => {
+    try {
+      localStorage.setItem('procash_view_mode', viewMode);
+    } catch (e) {}
+  }, [viewMode]);
 
   // Fetch Dashboard & Projects Data
   const fetchData = useCallback(async () => {
@@ -205,6 +457,10 @@ export default function App() {
     if (projRes.success) {
       setProjects(projRes.data);
       setSelectedProject((prev) => {
+        if (!prev && detailProjectId) {
+          const found = projRes.data.find((p) => String(p.project_id || p.id) === String(detailProjectId));
+          return found || null;
+        }
         if (!prev) return null;
         const prevId = prev.project_id || prev.id;
         const found = projRes.data.find((p) => (p.project_id || p.id) === prevId);
@@ -236,6 +492,12 @@ export default function App() {
   }, []);
 
   const handleLogout = async () => {
+    try {
+      localStorage.removeItem('procash_active_tab');
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    } catch (e) {}
     await apiLogout();
     setCurrentUser(null);
   };
@@ -265,8 +527,8 @@ export default function App() {
       setDetailModalOpen(false);
       setSelectedProject(null);
       if (activeTab === 'project-detail') {
-        setActiveTab(previousTab || 'projects');
-        setDetailProjectId(null);
+        const returnTab = previousTab && previousTab !== 'project-detail' ? previousTab : 'projects';
+        handleTabChange(returnTab);
       }
     }
     fetchData();
@@ -347,6 +609,8 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         appSettings={appSettings}
+        dailyNotifData={dailyNotifData}
+        onOpenDailyBriefing={() => setDailyBriefingOpen(true)}
       />
 
       {/* Main Panel Content Area */}
@@ -367,6 +631,18 @@ export default function App() {
           onLogout={handleLogout}
           onNewProject={() => setCreateModalOpen(true)}
           onOpenSimulator={() => setSimulatorModalOpen(true)}
+          onOpenDailyBriefing={() => setDailyBriefingOpen(true)}
+          onOpenPayment={(p) => {
+            setSelectedProject(p);
+            setPaymentModalOpen(true);
+          }}
+          onOpenWhatsApp={(p) => {
+            setSelectedProject(p);
+            setWhatsAppModalOpen(true);
+          }}
+          onOpenDetail={handleOpenDetail}
+          onSelectTab={handleTabChange}
+          showToast={showToast}
         />
 
         {/* Page Container - Tight padding and fluid width matching Image 2 */}
@@ -377,8 +653,8 @@ export default function App() {
             <FilamentProjectDetailPage
               projectId={detailProjectId}
               onBack={() => {
-                setActiveTab(previousTab || 'projects');
-                setDetailProjectId(null);
+                const returnTab = previousTab && previousTab !== 'project-detail' ? previousTab : 'projects';
+                handleTabChange(returnTab);
               }}
               onOpenPayment={(p) => {
                 setSelectedProject(p);
@@ -494,51 +770,57 @@ export default function App() {
                     setWhatsAppModalOpen(true);
                   }}
                   onOpenSimulator={() => setSimulatorModalOpen(true)}
+                  selectedWorkflowStage={selectedWorkflowStage}
+                  onSelectWorkflowStage={setSelectedWorkflowStage}
                 />
               )}
 
               {/* Filament Table Builder (Subkon Table for 'team', Projects Table for others) */}
-              {activeTab === 'team' ? (
-                <FilamentSubkonTable
-                  projects={projects}
-                  currentUser={currentUser}
-                  canEdit={canEdit}
-                  onOpenDetail={handleOpenDetail}
-                  showToast={showToast}
-                />
-              ) : (
-                <FilamentTable
-                  projects={projects}
-                  loading={loading}
-                  currentFilter={currentFilter}
-                  setFilter={handleFilterChange}
-                  searchQuery={searchQuery}
-                  setSearchQuery={setSearchQuery}
-                  viewMode={viewMode}
-                  setViewMode={setViewMode}
-                  canEdit={canEdit}
-                  currentUser={currentUser}
-                  onOpenDetail={handleOpenDetail}
-                  onOpenPayment={(p) => {
-                    setSelectedProject(p);
-                    setPaymentModalOpen(true);
-                  }}
-                  onOpenTeamPayment={handleOpenDetail}
-                  onOpenWhatsApp={(p) => {
-                    setSelectedProject(p);
-                    setWhatsAppModalOpen(true);
-                  }}
-                  onOpenEditNotes={(p) => {
-                    setSelectedProject(p);
-                    setNotesModalOpen(true);
-                  }}
-                  onToggleStatus={handleToggleStatus}
-                  onOpenEditProject={handleOpenEditProject}
-                  onDeleteProject={handleOpenDeleteProject}
-                  onRefresh={fetchData}
-                  showToast={showToast}
-                />
-              )}
+              <ErrorBoundary onReset={fetchData} onGoHome={() => { setViewMode('list'); setActiveTab('dashboard'); }}>
+                {activeTab === 'team' ? (
+                  <FilamentSubkonTable
+                    projects={projects}
+                    currentUser={currentUser}
+                    canEdit={canEdit}
+                    onOpenDetail={handleOpenDetail}
+                    showToast={showToast}
+                  />
+                ) : (
+                  <FilamentTable
+                    projects={projects}
+                    loading={loading}
+                    currentFilter={currentFilter}
+                    setFilter={handleFilterChange}
+                    selectedWorkflowStage={selectedWorkflowStage}
+                    onClearWorkflowStage={() => setSelectedWorkflowStage(null)}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    viewMode={viewMode}
+                    setViewMode={setViewMode}
+                    canEdit={canEdit}
+                    currentUser={currentUser}
+                    onOpenDetail={handleOpenDetail}
+                    onOpenPayment={(p) => {
+                      setSelectedProject(p);
+                      setPaymentModalOpen(true);
+                    }}
+                    onOpenTeamPayment={handleOpenDetail}
+                    onOpenWhatsApp={(p) => {
+                      setSelectedProject(p);
+                      setWhatsAppModalOpen(true);
+                    }}
+                    onOpenEditNotes={(p) => {
+                      setSelectedProject(p);
+                      setNotesModalOpen(true);
+                    }}
+                    onToggleStatus={handleToggleStatus}
+                    onOpenEditProject={handleOpenEditProject}
+                    onDeleteProject={handleOpenDeleteProject}
+                    onRefresh={fetchData}
+                    showToast={showToast}
+                  />
+                )}
+              </ErrorBoundary>
             </>
           )}
 
@@ -557,6 +839,23 @@ export default function App() {
         }}
         onSuccess={fetchData}
         showToast={showToast}
+      />
+
+      <FilamentDailyBriefingModal
+        isOpen={dailyBriefingOpen}
+        onClose={() => setDailyBriefingOpen(false)}
+        data={dailyNotifData}
+        onOpenWhatsApp={(p) => {
+          setSelectedProject(p);
+          setWhatsAppModalOpen(true);
+        }}
+        onOpenPayment={(p) => {
+          setSelectedProject(p);
+          setPaymentModalOpen(true);
+        }}
+        onOpenDetail={handleOpenDetail}
+        onSelectTab={handleTabChange}
+        appSettings={appSettings}
       />
 
       <FilamentProjectSimulatorModal

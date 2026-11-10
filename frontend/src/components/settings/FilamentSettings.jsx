@@ -19,7 +19,9 @@ import {
   ShieldCheck,
   Percent,
   Sliders,
-  Check
+  Check,
+  Bell,
+  Clock
 } from 'lucide-react';
 import { apiGetAppSettings, apiSaveAppSettings, apiTestGeminiKey } from '../../services/api';
 import { getInitials } from '../../utils/format';
@@ -45,6 +47,9 @@ export default function FilamentSettings({ currentUser, showToast, onSettingsUpd
     default_bank_account_holder: 'Tim Manajemen Keuangan',
     default_tax_percent: '0',
     currency_symbol: 'Rp',
+    notif_auto_briefing: '1',
+    notif_upcoming_days: '7',
+    notif_desktop_enabled: '1',
     gemini_api_key: '',
     has_gemini_key: false,
     masked_gemini_key: ''
@@ -149,7 +154,10 @@ export default function FilamentSettings({ currentUser, showToast, onSettingsUpd
         default_bank_account_number: form.default_bank_account_number.trim(),
         default_bank_account_holder: form.default_bank_account_holder.trim(),
         default_tax_percent: form.default_tax_percent,
-        currency_symbol: form.currency_symbol.trim() || 'Rp'
+        currency_symbol: form.currency_symbol.trim() || 'Rp',
+        notif_auto_briefing: form.notif_auto_briefing === '1' || form.notif_auto_briefing === true ? '1' : '0',
+        notif_upcoming_days: String(form.notif_upcoming_days || '7'),
+        notif_desktop_enabled: form.notif_desktop_enabled === '1' || form.notif_desktop_enabled === true ? '1' : '0'
       };
 
       // Only pass gemini_api_key if user typed something
@@ -711,6 +719,115 @@ export default function FilamentSettings({ currentUser, showToast, onSettingsUpd
                 />
                 <Percent className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 6. PENGINGAT & NOTIFIKASI HARIAN (DAILY REMINDERS & NOTIFICATIONS) */}
+        <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200/70 dark:border-purple-800/70 flex items-center justify-center text-purple-600 dark:text-purple-400">
+              <Bell className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                Pengingat & Notifikasi Harian (Penagihan, Termin, Piutang & Subkon)
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Atur pengingat berkala untuk mengingatkan jatuh tempo termin, penagihan piutang, dan honor tim subkon setiap hari.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {/* Auto daily briefing toggle */}
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800">
+              <input
+                type="checkbox"
+                id="notif_auto_briefing"
+                checked={form.notif_auto_briefing === '1' || form.notif_auto_briefing === true}
+                onChange={(e) => setForm(prev => ({ ...prev, notif_auto_briefing: e.target.checked ? '1' : '0' }))}
+                className="mt-0.5 rounded border-slate-300 dark:border-slate-700 text-slate-900 focus:ring-0 cursor-pointer"
+              />
+              <label htmlFor="notif_auto_briefing" className="cursor-pointer select-none">
+                <div className="text-xs font-bold text-slate-900 dark:text-white">
+                  Tampilkan Pop-up Rekap Pengingat Harian (Briefing) Otomatis
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Secara otomatis memunculkan rekapitulasi agenda penagihan dan honor subkon saat Anda pertama kali membuka dashboard setiap hari.
+                </div>
+              </label>
+            </div>
+
+            {/* Threshold for upcoming payment terms */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Ambang Batas Pengingat Termin Mendatang (Hari)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={form.notif_upcoming_days || '7'}
+                    onChange={(e) => setForm(prev => ({ ...prev, notif_upcoming_days: e.target.value }))}
+                    className="w-full text-xs font-mono font-bold rounded-xl pl-3.5 pr-8 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  />
+                  <Clock className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Termin yang jatuh tempo dalam rentang hari ini akan dimunculkan sebagai pengingat mendatang.
+                </p>
+              </div>
+
+              {/* Desktop notification test button */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Notifikasi Layar Desktop / Browser
+                </label>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!('Notification' in window)) {
+                      if (showToast) showToast('Browser tidak mendukung notifikasi desktop.', 'warning');
+                      return;
+                    }
+                    try {
+                      const p = await Notification.requestPermission();
+                      if (p === 'granted') {
+                        new Notification('🔔 Pengingat ProCash', {
+                          body: 'Notifikasi desktop aktif! Anda akan mendapatkan pengingat harian untuk penagihan termin dan honor subkon.',
+                          icon: '/favicon.svg'
+                        });
+                        if (showToast) showToast('Notifikasi desktop berhasil diaktifkan dan diuji!');
+                      } else {
+                        if (showToast) showToast('Izin notifikasi desktop ditolak oleh browser.', 'warning');
+                      }
+                    } catch (err) {
+                      if (showToast) showToast('Error: ' + err.message, 'danger');
+                    }
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-purple-200 dark:border-purple-800/80 bg-purple-50/70 dark:bg-purple-950/30 hover:bg-purple-100 text-purple-700 dark:text-purple-300 font-bold text-xs transition cursor-pointer"
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                  <span>Uji Coba Notifikasi Desktop</span>
+                </button>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Memunculkan pemberitahuan pop-up langsung di sistem operasi / browser Anda.
+                </p>
+              </div>
+            </div>
+
+            {/* Cron background automation tip */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 text-xs">
+              <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mb-1">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Otomatisasi Cron Job Harian di Server / Windows Task Scheduler</span>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                Aplikasi ini dilengkapi skrip mandiri <code className="px-1 py-0.5 rounded bg-slate-200 dark:bg-slate-700 font-mono text-[10px]">cron_daily_notifications.php</code> yang dapat dijalankan secara otomatis setiap hari (misal jam 08:00 WIB) untuk mencatat log audit dan memproses pengingat harian secara berkala.
+              </p>
             </div>
           </div>
         </div>

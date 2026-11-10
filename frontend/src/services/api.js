@@ -77,7 +77,11 @@ export async function apiLogin(identifier, password, remember = false) {
 }
 
 export async function apiLogout() {
+  try {
+    localStorage.removeItem('procash_active_tab');
+  } catch (e) {}
   await fetch(getEndpoint('logout.php'));
+  window.location.hash = '';
   window.location.reload();
 }
 
@@ -339,5 +343,26 @@ export async function apiSaveAppSettings(settings) {
   return request(`${API_BASE}?action=save_settings`, {
     method: 'POST',
     body: JSON.stringify(settings)
+  });
+}
+
+// ---------------------------------------------------------------------
+// Daily Notifications & Reminders
+// ---------------------------------------------------------------------
+export async function apiGetDailyNotifications(includeDismissed = false) {
+  const query = includeDismissed ? '&include_dismissed=1' : '';
+  return request(`${API_BASE}?action=daily_notifications${query}`);
+}
+
+export async function apiDismissNotification(notifKey) {
+  return request(`${API_BASE}?action=dismiss_notification`, {
+    method: 'POST',
+    body: JSON.stringify({ notif_key: notifKey })
+  });
+}
+
+export async function apiClearDismissedNotifications() {
+  return request(`${API_BASE}?action=clear_dismissed_notifications`, {
+    method: 'POST'
   });
 }

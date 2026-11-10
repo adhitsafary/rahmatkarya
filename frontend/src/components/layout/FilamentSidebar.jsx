@@ -24,7 +24,9 @@ export default function FilamentSidebar({
   setCollapsed,
   currentUser,
   onLogout,
-  appSettings
+  appSettings,
+  dailyNotifData,
+  onOpenDailyBriefing
 }) {
   const isAdmin = currentUser?.role === 'ADMIN';
 
@@ -243,6 +245,18 @@ export default function FilamentSidebar({
                           <span className="truncate">{item.label}</span>
                         )}
                       </div>
+
+                      {!collapsed && item.id === 'receivables' && dailyNotifData?.summary?.receivables_count > 0 && (
+                        <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full font-mono bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300">
+                          {dailyNotifData.summary.receivables_count}
+                        </span>
+                      )}
+
+                      {!collapsed && item.id === 'team' && dailyNotifData?.summary?.subkon_count > 0 && (
+                        <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full font-mono bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
+                          {dailyNotifData.summary.subkon_count}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -250,6 +264,32 @@ export default function FilamentSidebar({
             );
           })}
         </div>
+
+        {/* Daily Reminder Quick Pill */}
+        {dailyNotifData?.summary?.total_alerts > 0 && onOpenDailyBriefing && (
+          <div className={`px-2.5 pb-2 ${collapsed ? 'flex justify-center' : ''}`}>
+            <button
+              type="button"
+              onClick={onOpenDailyBriefing}
+              className={`w-full flex items-center ${
+                collapsed ? 'justify-center p-2' : 'justify-between p-2'
+              } rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/60 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition cursor-pointer shadow-2xs`}
+              title="Buka Rekap Agenda Finansial Harian"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                {!collapsed && (
+                  <span className="text-[11px] font-bold truncate">Agenda Harian</span>
+                )}
+              </div>
+              {!collapsed && (
+                <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full font-mono bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100">
+                  {dailyNotifData.summary.total_alerts}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* User Profile Footer */}
         <div className={`p-2.5 border-t border-slate-100 dark:border-slate-800 ${collapsed ? 'flex justify-center' : ''}`}>

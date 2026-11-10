@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Menu, Sun, Moon, Plus, Search, SlidersHorizontal, X, Calculator } from 'lucide-react';
+import { Menu, Sun, Moon, Search, SlidersHorizontal, X, Calculator } from 'lucide-react';
+import FilamentNotificationDropdown from '../common/FilamentNotificationDropdown';
 
 export default function FilamentTopbar({
   collapsed,
@@ -12,6 +13,12 @@ export default function FilamentTopbar({
   setSearchQuery,
   onNewProject,
   onOpenSimulator,
+  onOpenDailyBriefing,
+  onOpenPayment,
+  onOpenWhatsApp,
+  onOpenDetail,
+  onSelectTab,
+  showToast,
   canEdit = true
 }) {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -150,22 +157,15 @@ export default function FilamentTopbar({
                 <span className="hidden md:inline">Simulasi SPK</span>
               </button>
 
-              {/* New Project Button */}
-              {canEdit ? (
-                <button
-                  onClick={onNewProject}
-                  className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-bold text-xs px-2.5 sm:px-3 py-1.5 rounded-xl shadow-xs transition cursor-pointer shrink-0"
-                  title="Buat Proyek Baru"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Proyek Baru</span>
-                  <span className="sm:hidden text-xs">Proyek</span>
-                </button>
-              ) : (
-                <span className="hidden sm:inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold text-xs border border-slate-200 dark:border-slate-700 shrink-0">
-                  Read-Only
-                </span>
-              )}
+              {/* Daily Notifications & Reminders Dropdown */}
+              <FilamentNotificationDropdown
+                onOpenDailyBriefing={onOpenDailyBriefing}
+                onOpenPayment={onOpenPayment}
+                onOpenWhatsApp={onOpenWhatsApp}
+                onOpenDetail={onOpenDetail}
+                onSelectTab={onSelectTab}
+                showToast={showToast}
+              />
 
               {/* Light / Dark Mode Toggle Icon Button */}
               <button

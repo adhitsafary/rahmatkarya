@@ -1,19 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  TrendingUp, 
   BarChart3, 
   PieChart, 
   AlertTriangle, 
   CheckCircle2, 
   Clock, 
   ArrowUpRight, 
-  Calculator, 
   CreditCard, 
-  Sparkles,
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  ShieldCheck,
   Zap,
   Calendar,
   Users,
@@ -75,9 +71,40 @@ export default function FilamentCashflowAnalytics({
   onOpenDetail,
   onOpenPayment,
   onOpenWhatsApp,
-  onOpenSimulator
+  onOpenSimulator,
+  selectedWorkflowStage = null,
+  onSelectWorkflowStage
 }) {
   const [hoveredProject, setHoveredProject] = useState(null);
+  const [hoveredSlice, setHoveredSlice] = useState(null);
+  const [internalSelectedStage, setInternalSelectedStage] = useState(null);
+
+  const activeSelectedStage = selectedWorkflowStage !== undefined && selectedWorkflowStage !== null ? selectedWorkflowStage : internalSelectedStage;
+
+  const handleSelectStage = (stageKey) => {
+    const next = activeSelectedStage === stageKey ? null : stageKey;
+    if (onSelectWorkflowStage) {
+      onSelectWorkflowStage(next);
+    }
+    setInternalSelectedStage(next);
+  };
+
+  const getNormalizedStage = (p) => {
+    let step = p.workflow_step || 'KONTRAK';
+    if (step === 'KONTRAK_DP') step = 'KONTRAK';
+    if (step === 'PEMBAYARAN_AKHIR') step = 'PELUNASAN';
+    if (!['KONTRAK', 'PENGERJAAN', 'REVISI', 'PELUNASAN', 'DONE'].includes(step)) step = 'PENGERJAAN';
+    return step;
+  };
+
+  const selectedStageProjects = useMemo(() => {
+    if (!activeSelectedStage) return [];
+    return projects.filter(p => getNormalizedStage(p) === activeSelectedStage);
+  }, [projects, activeSelectedStage]);
+
+  // Sorting and limit state for cashflow comparison chart (Default: 3 data teratas)
+  const [chartSort, setChartSort] = useState('highest_spk'); // 'highest_spk' | 'lowest_spk' | 'highest_rec' | 'newest'
+  const [showAllChart, setShowAllChart] = useState(false);
 
   // Filter Radar Category: 'all' | 'receivables' | 'revisions' | 'deadlines' | 'subkons'
   const [radarFilter, setRadarFilter] = useState('all');
@@ -219,18 +246,34 @@ export default function FilamentCashflowAnalytics({
     };
   }, [projects, summary]);
 
-  // Visual Chart calculations
+  // Visual Chart calculations: default 3 data teratas (Terbesar -> Terkecil)
   const chartProjects = useMemo(() => {
-    return [...projects].slice(0, 7);
-  }, [projects]);
+    let list = [...projects];
+    if (chartSort === 'highest_spk') {
+      list.sort((a, b) => (parseFloat(b.total_contract_value) || 0) - (parseFloat(a.total_contract_value) || 0));
+    } else if (chartSort === 'lowest_spk') {
+      list.sort((a, b) => (parseFloat(a.total_contract_value) || 0) - (parseFloat(b.total_contract_value) || 0));
+    } else if (chartSort === 'highest_rec') {
+      list.sort((a, b) => (parseFloat(b.client_receivable_remaining) || 0) - (parseFloat(a.client_receivable_remaining) || 0));
+    } else if (chartSort === 'newest') {
+      list.sort((a, b) => (b.project_id || b.id || 0) - (a.project_id || a.id || 0));
+    }
+    return showAllChart ? list : list.slice(0, 3);
+  }, [projects, chartSort, showAllChart]);
 
   const maxVal = useMemo(() => {
     let max = 1000000;
     chartProjects.forEach(p => {
       const c = parseFloat(p.total_contract_value) || 0;
+      const pd = parseFloat(p.total_paid_by_client) || 0;
+      const rc = parseFloat(p.client_receivable_remaining) || 0;
+      const tm = parseFloat(p.total_agreed_team_honor) || 0;
       if (c > max) max = c;
+      if (pd > max) max = pd;
+      if (rc > max) max = rc;
+      if (tm > max) max = tm;
     });
-    return max * 1.1; // 10% breathing room
+    return max * 1.05; // 5% breathing room
   }, [chartProjects]);
 
   // Donut chart path calculations
@@ -306,132 +349,66 @@ export default function FilamentCashflowAnalytics({
         type: 'subkons'
       };
     }
+
+    // Pie Chart Drilldown: Stage selection (KONTRAK, PENGERJAAN, REVISI, PELUNASAN, DONE, ALL)
+    if (modalType && modalType.startsWith('stage_')) {
+      const stageKey = modalType.replace('stage_', '');
+
+      const getNormalizedStage = (p) => {
+        let step = p.workflow_step || 'KONTRAK';
+        if (step === 'KONTRAK_DP') step = 'KONTRAK';
+        if (step === 'PEMBAYARAN_AKHIR') step = 'PELUNASAN';
+        if (!['KONTRAK', 'PENGERJAAN', 'REVISI', 'PELUNASAN', 'DONE'].includes(step)) step = 'PENGERJAAN';
+        return step;
+      };
+
+      if (stageKey === 'ALL') {
+        return {
+          title: 'Semua Proyek Studio',
+          subtitle: `Menampilkan total ${projects.length} proyek dalam seluruh alur kerja rancang bangun studio.`,
+          icon: PieChart,
+          iconBg: 'bg-indigo-600',
+          badgeColor: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300',
+          data: projects,
+          type: 'stage',
+          stageKey: 'ALL',
+          stageLabel: 'Semua Proyek',
+          totalNominal: stats.totalContract
+        };
+      }
+
+      const st = stats.stages[stageKey] || { label: stageKey, count: 0, nominal: 0, color: '#3B82F6' };
+      const stageProjects = projects.filter(p => getNormalizedStage(p) === stageKey);
+
+      return {
+        title: `Tahapan: ${st.label}`,
+        subtitle: `Menampilkan ${stageProjects.length} proyek pada tahap ${st.label} (Akumulasi SPK: ${formatRupiah(st.nominal)}).`,
+        icon: PieChart,
+        iconBg: stageKey === 'DONE' ? 'bg-emerald-600' : (stageKey === 'REVISI' ? 'bg-amber-500' : (stageKey === 'PELUNASAN' ? 'bg-pink-600' : (stageKey === 'PENGERJAAN' ? 'bg-indigo-600' : 'bg-blue-600'))),
+        badgeColor: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+        stageColor: st.color,
+        data: stageProjects,
+        type: 'stage',
+        stageKey,
+        stageLabel: st.label,
+        totalNominal: st.nominal
+      };
+    }
+
     return null;
-  }, [modalType, stats]);
+  }, [modalType, stats, projects]);
 
   return (
     <div className="space-y-4">
 
       {/* ================================================================= */}
-      {/* 1. TOP INTERACTIVE KPI METRIC BANNER                              */}
-      {/* ================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        
-        {/* KPI 1: Profit Margin Ratio */}
-        <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs hover:shadow-xs transition relative overflow-hidden group">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Margin Laba Bersih</span>
-            <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-              <TrendingUp className="w-4 h-4" />
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black font-mono text-slate-900 dark:text-white">
-              {stats.profitMargin}%
-            </span>
-            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
-              Margin Sehat
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate">
-            Kas Masuk: {formatRupiah(stats.totalPaidClients)}
-          </p>
-          <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full mt-3 overflow-hidden">
-            <div 
-              className="h-full bg-emerald-500 rounded-full transition-all duration-700" 
-              style={{ width: `${Math.min(100, Math.max(0, stats.profitMargin))}%` }}
-            />
-          </div>
-        </div>
-
-        {/* KPI 2: Realisasi Termin / Collection Rate */}
-        <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs hover:shadow-xs transition relative overflow-hidden group">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Tingkat Penagihan</span>
-            <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-              <ShieldCheck className="w-4 h-4" />
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black font-mono text-slate-900 dark:text-white">
-              {stats.collectionRate}%
-            </span>
-            <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 font-mono">
-              Tertagih
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate">
-            Sisa Piutang: {formatRupiah(stats.totalReceivables)}
-          </p>
-          <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full mt-3 overflow-hidden">
-            <div 
-              className="h-full bg-blue-500 rounded-full transition-all duration-700" 
-              style={{ width: `${Math.min(100, Math.max(0, stats.collectionRate))}%` }}
-            />
-          </div>
-        </div>
-
-        {/* KPI 3: Alokasi Subkon & Tim */}
-        <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs hover:shadow-xs transition relative overflow-hidden group">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Plafon Honor Subkon</span>
-            <span className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-              <CreditCard className="w-4 h-4" />
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black font-mono text-slate-900 dark:text-white">
-              {stats.subkonExpenseRatio}%
-            </span>
-            <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 font-mono">
-              dari SPK
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate">
-            Pending Bayar: {formatRupiah(stats.totalPayables)}
-          </p>
-          <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full mt-3 overflow-hidden">
-            <div 
-              className="h-full bg-amber-500 rounded-full transition-all duration-700" 
-              style={{ width: `${Math.min(100, Math.max(0, stats.subkonExpenseRatio))}%` }}
-            />
-          </div>
-        </div>
-
-        {/* KPI 4: Interactive Project Simulator Launcher */}
-        <div className="rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 dark:from-blue-950/40 dark:to-slate-900 p-4 shadow-2xs hover:shadow-xs transition flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
-              Simulasi SPK Cepat
-            </span>
-            <span className="p-1.5 rounded-lg bg-blue-600 text-white shadow-2xs">
-              <Calculator className="w-4 h-4" />
-            </span>
-          </div>
-          <div className="my-2">
-            <p className="text-xs text-blue-950/80 dark:text-blue-200/90 font-medium">
-              Hitung estimasi laba, porsi DP Jonggol, & jadwal 3 termin otomatis.
-            </p>
-          </div>
-          <button
-            onClick={onOpenSimulator}
-            className="w-full py-1.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer active:scale-98"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Buka Kalkulator SPK</span>
-          </button>
-        </div>
-
-      </div>
-
-      {/* ================================================================= */}
-      {/* 2. DUAL VISUAL CHARTS ROW (CASHFLOW BARS + WORKFLOW RADAR DONUT)  */}
+      {/* 1. DUAL VISUAL CHARTS ROW (CASHFLOW BARS + WORKFLOW RADAR DONUT)  */}
       {/* ================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         
         {/* Left Chart (2 Cols): Interactive Cashflow Comparison Bars */}
         <div className="lg:col-span-2 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-2xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800 pb-3">
             <div>
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -440,24 +417,54 @@ export default function FilamentCashflowAnalytics({
                 </h3>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Visualisasi realisasi Termin Masuk vs Sisa Piutang vs Honor Subkon
+                Visualisasi realisasi Termin Masuk vs Sisa Piutang vs Honor Subkon (Urutan: Terbesar &rarr; Terkecil)
               </p>
             </div>
 
-            {/* Legend & Switcher */}
-            <div className="flex items-center gap-3 text-[10px] font-bold font-mono">
-              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>
-                Termin Masuk
-              </span>
-              <span className="flex items-center gap-1.5 text-rose-500 dark:text-rose-400">
-                <span className="w-2.5 h-2.5 rounded-sm bg-rose-500"></span>
-                Sisa Piutang
-              </span>
-              <span className="flex items-center gap-1.5 text-amber-500 dark:text-amber-400">
-                <span className="w-2.5 h-2.5 rounded-sm bg-amber-400"></span>
-                Honor Tim
-              </span>
+            {/* Controls: Sort Dropdown, Tombol Lihat Semua & Legend */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Dropdown Sort */}
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={chartSort}
+                  onChange={(e) => setChartSort(e.target.value)}
+                  className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-[11px] font-bold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+                  title="Urutan Proyek"
+                >
+                  <option value="highest_spk">Total SPK (Terbesar - Terkecil)</option>
+                  <option value="lowest_spk">Total SPK (Terkecil - Terbesar)</option>
+                  <option value="highest_rec">Sisa Piutang Terbesar</option>
+                  <option value="newest">Proyek Terbaru</option>
+                </select>
+
+                {projects.length > 3 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllChart(!showAllChart)}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    title={showAllChart ? "Tampilkan 3 Proyek Saja" : "Tampilkan Seluruh Proyek"}
+                  >
+                    <Eye className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{showAllChart ? 'Ringkas (3)' : `Lihat Semua (${projects.length})`}</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Legend */}
+              <div className="flex items-center gap-2.5 text-[10px] font-bold font-mono pl-2 border-l border-slate-200 dark:border-slate-700">
+                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>
+                  Termin Masuk
+                </span>
+                <span className="flex items-center gap-1 text-rose-500 dark:text-rose-400">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-rose-500"></span>
+                  Sisa Piutang
+                </span>
+                <span className="flex items-center gap-1 text-amber-500 dark:text-amber-400">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-amber-400"></span>
+                  Honor Tim
+                </span>
+              </div>
             </div>
           </div>
 
@@ -475,11 +482,12 @@ export default function FilamentCashflowAnalytics({
                   const rec = parseFloat(p.client_receivable_remaining) || 0;
                   const teamTotal = parseFloat(p.total_agreed_team_honor) || 0;
 
-                  const paidW = maxVal > 0 ? (paid / maxVal) * 100 : 0;
-                  const recW = maxVal > 0 ? (rec / maxVal) * 100 : 0;
-                  const teamW = maxVal > 0 ? (teamTotal / maxVal) * 100 : 0;
+                  const paidW = maxVal > 0 ? Math.max(0, Math.min(100, (paid / maxVal) * 100)) : 0;
+                  const recW = maxVal > 0 ? Math.max(0, Math.min(100, (Math.max(0, rec) / maxVal) * 100)) : 0;
+                  const teamW = maxVal > 0 ? Math.max(0, Math.min(100, (teamTotal / maxVal) * 100)) : 0;
 
                   const isHovered = hoveredProject === p.project_id;
+                  const rankBadge = getRankBadge(idx);
 
                   return (
                     <div 
@@ -496,9 +504,15 @@ export default function FilamentCashflowAnalytics({
                       {/* Bar Top Label */}
                       <div className="flex items-center justify-between text-xs mb-1.5">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-5 h-5 rounded-md bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-[9px] font-black font-mono flex items-center justify-center shrink-0">
-                            {getInitials(p.project_name) || `P${idx+1}`}
-                          </span>
+                          {chartSort === 'highest_spk' ? (
+                            <span className={`w-5 h-5 rounded-md text-[9px] font-black font-mono flex items-center justify-center shrink-0 ${rankBadge.class}`}>
+                              {rankBadge.label}
+                            </span>
+                          ) : (
+                            <span className="w-5 h-5 rounded-md bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-[9px] font-black font-mono flex items-center justify-center shrink-0">
+                              {getInitials(p.project_name) || `P${idx+1}`}
+                            </span>
+                          )}
                           <span className="font-bold text-slate-900 dark:text-white truncate">
                             {p.project_name}
                           </span>
@@ -561,6 +575,24 @@ export default function FilamentCashflowAnalytics({
                     </div>
                   );
                 })}
+
+                {/* Tombol Lihat Semua di bawah daftar 3 data */}
+                {projects.length > 3 && (
+                  <div className="pt-2 text-center border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllChart(!showAllChart)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/50 transition cursor-pointer shadow-2xs active:scale-98"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>
+                        {showAllChart 
+                          ? 'Tampilkan 3 Data Saja (Ringkas)' 
+                          : `Lihat Semua (${projects.length} Proyek)`}
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -569,22 +601,33 @@ export default function FilamentCashflowAnalytics({
         {/* Right Chart (1 Col): Donut Distribution of Workflow Stages */}
         <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-2xs space-y-4 flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-              <PieChart className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              <div>
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight">
-                  STATUS ALUR KERJA PROYEK
-                </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Distribusi 5 tahapan alur SPK rancang bangun
-                </p>
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <PieChart className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight">
+                    STATUS ALUR KERJA PROYEK
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Distribusi 5 tahapan alur SPK rancang bangun
+                  </p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setModalType('stage_ALL')}
+                className="px-2 py-1 rounded-lg text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-900/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition cursor-pointer flex items-center gap-1"
+                title="Buka rincian semua proyek"
+              >
+                <span>Lihat Semua</span>
+                <ChevronRight className="w-3 h-3" />
+              </button>
             </div>
 
-            {/* Donut Chart SVG */}
-            <div className="flex items-center justify-center my-4">
+            {/* Donut Chart SVG (Interactive, Crisp Vector & Selectable per Color) */}
+            <div className="flex flex-col items-center justify-center my-3">
               <div className="relative w-36 h-36">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                <svg className="w-full h-full -rotate-90 pointer-events-auto" viewBox="0 0 36 36">
                   {/* Background Track */}
                   <circle
                     cx="18"
@@ -595,11 +638,15 @@ export default function FilamentCashflowAnalytics({
                     strokeWidth="3"
                     className="text-slate-100 dark:text-slate-800"
                   />
-                  {/* Slices */}
+                  {/* Interactive Slices */}
                   {donutData.map((slice) => {
                     if (slice.count === 0) return null;
                     const strokeDasharray = `${(slice.count / (projects.length || 1)) * 100} ${100 - (slice.count / (projects.length || 1)) * 100}`;
                     const strokeDashoffset = -slice.startAngle * (100 / 360);
+                    const isSelected = activeSelectedStage === slice.key;
+                    const isHovered = hoveredSlice?.key === slice.key;
+                    const isAnyActive = !!activeSelectedStage || !!hoveredSlice;
+                    const isDimmed = isAnyActive && !isSelected && !isHovered;
 
                     return (
                       <circle
@@ -609,48 +656,258 @@ export default function FilamentCashflowAnalytics({
                         r="15.9155"
                         fill="transparent"
                         stroke={slice.color}
-                        strokeWidth="3.2"
+                        strokeWidth={isSelected ? "4.8" : (isHovered ? "4.2" : "3.2")}
                         strokeDasharray={strokeDasharray}
                         strokeDashoffset={strokeDashoffset}
-                        className="transition-all duration-700 hover:opacity-80"
-                      />
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectStage(slice.key);
+                        }}
+                        onMouseEnter={() => setHoveredSlice(slice)}
+                        onMouseLeave={() => setHoveredSlice(null)}
+                        className="transition-all duration-200 cursor-pointer"
+                        style={{
+                          opacity: isDimmed ? 0.35 : 1,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <title>{`${slice.label}: ${slice.count} Proyek (${formatRupiah(slice.nominal)}) - Klik untuk pilih warna ini`}</title>
+                      </circle>
                     );
                   })}
                 </svg>
 
-                {/* Donut Inner Label */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-xl font-black font-mono text-slate-900 dark:text-white">
-                    {projects.length}
-                  </span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                    Total Proyek
-                  </span>
-                </div>
+                {/* Donut Inner Label (Properly sized to the inner hole so it does NOT block slice clicks) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeSelectedStage) {
+                      handleSelectStage(activeSelectedStage);
+                    } else {
+                      setModalType('stage_ALL');
+                    }
+                  }}
+                  className="w-[102px] h-[102px] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center text-center rounded-full cursor-pointer hover:bg-slate-50/60 dark:hover:bg-slate-800/60 transition-all p-2 group pointer-events-auto"
+                  title={activeSelectedStage ? "Klik untuk reset pilihan warna" : "Klik untuk melihat semua data proyek"}
+                >
+                  {hoveredSlice ? (
+                    <>
+                      <span className="text-xl font-black font-mono leading-none transition-colors" style={{ color: hoveredSlice.color }}>
+                        {hoveredSlice.count}
+                      </span>
+                      <span className="text-[9px] font-extrabold uppercase tracking-tight truncate max-w-[80px] mt-0.5 leading-tight" style={{ color: hoveredSlice.color }}>
+                        {hoveredSlice.label}
+                      </span>
+                      <span className="text-[8px] font-bold text-slate-400 mt-0.5 flex items-center gap-0.5">
+                        {activeSelectedStage === hoveredSlice.key ? '✕ Batal' : 'Pilih Warna'}
+                      </span>
+                    </>
+                  ) : activeSelectedStage ? (
+                    <>
+                      <span className="text-xl font-black font-mono leading-none" style={{ color: stats.stages[activeSelectedStage]?.color }}>
+                        {stats.stages[activeSelectedStage]?.count || 0}
+                      </span>
+                      <span className="text-[9px] font-extrabold uppercase tracking-tight truncate max-w-[80px] mt-0.5 leading-tight" style={{ color: stats.stages[activeSelectedStage]?.color }}>
+                        {stats.stages[activeSelectedStage]?.label}
+                      </span>
+                      <span className="text-[8px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full mt-0.5 hover:bg-slate-200">
+                        ✕ Reset
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xl font-black font-mono text-slate-900 dark:text-white leading-none">
+                        {projects.length}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+                        Total Proyek
+                      </span>
+                      <span className="text-[8px] font-semibold text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Pilih Warna
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Click Hint Helper */}
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 text-center">
+                  {activeSelectedStage 
+                    ? `Warna terpilih: ${stats.stages[activeSelectedStage]?.label}` 
+                    : '💡 Klik warna diagram untuk memilih card'}
+                </span>
+                {activeSelectedStage && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectStage(activeSelectedStage)}
+                    className="text-[10px] font-bold text-rose-500 hover:text-rose-600 underline cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Workflow Stage Legend List */}
-            <div className="space-y-1.5 pt-1">
-              {Object.entries(stats.stages).map(([k, st]) => (
-                <div key={k} className="flex items-center justify-between text-xs p-1 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: st.color }}></span>
-                    <span className="text-slate-700 dark:text-slate-300 font-semibold truncate text-[11px]">
-                      {st.label}
+            {/* Workflow Stage Legend List (Clickable per stage to select color) */}
+            <div className="space-y-1 pt-0.5">
+              {Object.entries(stats.stages).map(([k, st]) => {
+                const isSelected = activeSelectedStage === k;
+                const isHovered = hoveredSlice?.key === k;
+                return (
+                  <div
+                    key={k}
+                    onClick={() => handleSelectStage(k)}
+                    onMouseEnter={() => setHoveredSlice({ key: k, ...st })}
+                    onMouseLeave={() => setHoveredSlice(null)}
+                    className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition cursor-pointer group border ${
+                      isSelected
+                        ? 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 shadow-2xs font-bold'
+                        : isHovered
+                          ? 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700'
+                          : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                    }`}
+                    title={`Klik untuk memilih warna ${st.label}`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span 
+                        className="w-2.5 h-2.5 rounded-full shrink-0 transition-transform" 
+                        style={{ 
+                          backgroundColor: st.color,
+                          transform: isSelected ? 'scale(1.25)' : 'scale(1)'
+                        }}
+                      ></span>
+                      <span className={`truncate text-[11px] ${isSelected ? 'text-slate-900 dark:text-white font-extrabold' : 'text-slate-700 dark:text-slate-300'}`}>
+                        {st.label}
+                      </span>
+                      {isSelected && (
+                        <span 
+                          className="text-[9px] px-1 py-0.2 rounded font-bold uppercase tracking-wider shrink-0" 
+                          style={{ backgroundColor: `${st.color}22`, color: st.color }}
+                        >
+                          Dipilih
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 font-mono text-[11px] shrink-0">
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {st.count}
+                      </span>
+                      <span className="text-slate-400 text-[10px]">
+                        ({formatRupiah(st.nominal)})
+                      </span>
+                      <ChevronRight className={`w-3 h-3 text-slate-400 transition-opacity -mr-0.5 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Interactive Stage Project Cards Drawer (Inside Card) */}
+            {activeSelectedStage && (
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: stats.stages[activeSelectedStage]?.color }}></span>
+                    <span className="text-xs font-black uppercase text-slate-900 dark:text-white truncate">
+                      Kartu {stats.stages[activeSelectedStage]?.label}
+                    </span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold shrink-0">
+                      {selectedStageProjects.length}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 font-mono text-[11px] shrink-0">
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      {st.count}
-                    </span>
-                    <span className="text-slate-400 text-[10px]">
-                      ({formatRupiah(st.nominal)})
-                    </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setModalType(`stage_${activeSelectedStage}`)}
+                      className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-0.5"
+                    >
+                      <span>Pop-up</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectStage(activeSelectedStage)}
+                      className="text-[10px] font-bold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      ✕ Tutup
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                {/* Project Cards List */}
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+                  {selectedStageProjects.length === 0 ? (
+                    <p className="text-xs text-slate-400 py-3 text-center">Belum ada proyek di tahapan ini.</p>
+                  ) : (
+                    selectedStageProjects.map((p, idx) => (
+                      <div 
+                        key={p.project_id || p.id || idx}
+                        className="p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 hover:bg-slate-100/70 dark:hover:bg-slate-800/40 transition space-y-2 text-xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <h5 
+                              onClick={() => onOpenDetail(p)}
+                              className="font-bold text-xs text-slate-900 dark:text-white truncate cursor-pointer hover:underline"
+                            >
+                              {p.project_name}
+                            </h5>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                              Klien: <strong className="text-slate-700 dark:text-slate-300">{p.client_name}</strong>
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-mono font-bold text-slate-900 dark:text-white text-xs block">
+                              {formatRupiah(p.total_contract_value)}
+                            </span>
+                            {(parseFloat(p.client_receivable_remaining) || 0) > 0 ? (
+                              <span className="text-[9px] font-mono font-semibold text-rose-600 dark:text-rose-400 block">
+                                Piutang: {formatRupiah(p.client_receivable_remaining)}
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 block">
+                                Lunas 100%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action buttons inside card */}
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-slate-800 text-[10px]">
+                          <span className="text-slate-400 font-mono">
+                            Progres: <strong className="text-slate-700 dark:text-slate-300">{p.progress_percent || 0}%</strong>
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {(parseFloat(p.client_receivable_remaining) || 0) > 0 && (
+                              <button
+                                onClick={() => onOpenPayment(p)}
+                                className="px-2 py-0.5 rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:opacity-90 transition cursor-pointer"
+                              >
+                                Bayar
+                              </button>
+                            )}
+                            <button
+                              onClick={() => onOpenWhatsApp(p)}
+                              className="px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <WhatsAppIcon className="w-2.5 h-2.5" />
+                              <span>WA</span>
+                            </button>
+                            <button
+                              onClick={() => onOpenDetail(p)}
+                              className="px-2 py-0.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-bold transition cursor-pointer"
+                            >
+                              Detail
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
@@ -670,224 +927,195 @@ export default function FilamentCashflowAnalytics({
       <div className="space-y-3 pt-2">
         
         {/* Radar Header & Filter Pills */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <Flame className="w-4 h-4 text-rose-500 animate-pulse" />
+              <Flame className="w-4 h-4 text-rose-500" />
               <h3 className="font-black text-sm text-slate-900 dark:text-white tracking-tight uppercase">
                 RADAR KONTROL & PRIORITAS OPERASIONAL
               </h3>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Pusat peringatan otomatis: Amankan kas masuk, tertibkan kuota revisi, dan kawal deadline serah terima DED.
+            <p className="text-xs text-slate-400 mt-0.5">
+              Pusat peringatan otomatis: amankan kas masuk, tertibkan kuota revisi, dan kawal deadline serah terima DED.
             </p>
           </div>
 
-          {/* Filter Pills */}
+          {/* Minimalist Filter Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-            <button
-              onClick={() => setRadarFilter('all')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                radarFilter === 'all'
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs'
-                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              Semua Radar (4)
-            </button>
-            <button
-              onClick={() => setRadarFilter('receivables')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                radarFilter === 'receivables'
-                  ? 'bg-rose-600 text-white shadow-2xs'
-                  : 'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-50'
-              }`}
-            >
-              Piutang Klien ({stats.top5Receivables.length})
-            </button>
-            <button
-              onClick={() => setRadarFilter('revisions')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                radarFilter === 'revisions'
-                  ? 'bg-amber-600 text-white shadow-2xs'
-                  : 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60 hover:bg-amber-50'
-              }`}
-            >
-              Revisi Mayor ({stats.top5Revisions.length})
-            </button>
-            <button
-              onClick={() => setRadarFilter('deadlines')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                radarFilter === 'deadlines'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60 hover:bg-blue-50'
-              }`}
-            >
-              Deadline DED ({stats.top5Deadlines.length})
-            </button>
-            <button
-              onClick={() => setRadarFilter('subkons')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                radarFilter === 'subkons'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 hover:bg-emerald-50'
-              }`}
-            >
-              Honor Subkon ({stats.top5Subkons.length})
-            </button>
+            {[
+              { id: 'all', label: 'Semua Radar', count: 4, dot: 'bg-slate-400' },
+              { id: 'receivables', label: 'Piutang Klien', count: stats.top5Receivables.length, dot: 'bg-rose-500' },
+              { id: 'revisions', label: 'Revisi Mayor', count: stats.top5Revisions.length, dot: 'bg-amber-500' },
+              { id: 'deadlines', label: 'Deadline DED', count: stats.top5Deadlines.length, dot: 'bg-blue-500' },
+              { id: 'subkons', label: 'Honor Subkon', count: stats.top5Subkons.length, dot: 'bg-emerald-500' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setRadarFilter(tab.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                  radarFilter === tab.id
+                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${tab.dot}`} />
+                <span>{tab.label}</span>
+                <span className="text-[10px] opacity-75">({tab.count})</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* 4 Multi-Quadrant Radar Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        {/* 4 Multi-Quadrant Radar Cards Grid (1 Baris Penuh / 4 Kolom) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           
           {/* ============================================================= */}
           {/* RADAR 1: PERINGATAN PIUTANG TERBESAR                          */}
           {/* ============================================================= */}
           {(radarFilter === 'all' || radarFilter === 'receivables') && (
-            <div className="rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20 p-4 sm:p-4.5 shadow-2xs flex flex-col justify-between space-y-3 transition group">
-              
-              {/* Header with Top 5 trigger */}
-              <div className="flex items-center justify-between border-b border-rose-100 dark:border-rose-900/40 pb-2.5">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 flex flex-col justify-between space-y-3.5 transition">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="p-1.5 rounded-lg bg-rose-500 text-white shrink-0 shadow-2xs">
-                    <AlertTriangle className="w-4 h-4" />
-                  </span>
+                  <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                  </div>
                   <div className="min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400 block">
-                      PERINGATAN PIUTANG TERBESAR
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      Amankan Pelunasan SPK Klien
-                    </span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">
+                      Piutang Klien
+                    </h4>
+                    <p className="text-[10px] text-slate-400 truncate">
+                      Amankan Pelunasan
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   {stats.top5Receivables.length > 1 && (
                     <button
                       onClick={() => toggleExpand('receivables')}
-                      className="px-2 py-1 rounded-lg text-[11px] font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition cursor-pointer flex items-center gap-1"
-                      title="Buka / Tutup 5 Data Teratas di dalam kartu"
+                      className="px-2 py-0.5 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer flex items-center gap-0.5"
+                      title="Buka / Tutup 5 Data Teratas"
                     >
-                      <span>{expandedCards.receivables ? 'Ringkas' : '5 Teratas'}</span>
-                      {expandedCards.receivables ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      <span>{expandedCards.receivables ? 'Ringkas' : '5 Top'}</span>
+                      {expandedCards.receivables ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     </button>
                   )}
 
                   <button
                     onClick={() => setModalType('receivables')}
-                    className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer"
-                    title="Tampilkan Modal Detail 5 Piutang Teratas"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+                    title="Lihat Semua Piutang"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    <span>Lihat Semua</span>
                   </button>
                 </div>
               </div>
 
-              {/* Card Body: #1 Highlight or Inline Top 5 list */}
+              {/* Card Body */}
               {stats.highestReceivable ? (
                 <>
                   {!expandedCards.receivables ? (
-                    // Highlight #1 Only
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-200">
-                              #1 Terbesar
-                            </span>
-                            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                              {stats.highestReceivable.project_name}
-                            </h4>
-                          </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                            {stats.highestReceivable.client_name} {stats.highestReceivable.client_phone ? `• ${stats.highestReceivable.client_phone}` : ''}
+                    <div className="space-y-3 flex-1 flex flex-col justify-between">
+                      {/* Project Info & Metric */}
+                      <div className="p-3 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 space-y-2">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase font-mono bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                            #1 Terbesar
+                          </span>
+                          <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                            Belum Lunas
+                          </span>
+                        </div>
+
+                        <div>
+                          <h5 
+                            onClick={() => onOpenDetail(stats.highestReceivable)}
+                            className="font-bold text-sm text-slate-900 dark:text-white truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition"
+                            title={stats.highestReceivable.project_name}
+                          >
+                            {stats.highestReceivable.project_name}
+                          </h5>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                            {stats.highestReceivable.client_name}
                           </p>
                         </div>
 
-                        <div className="text-right shrink-0">
-                          <span className="text-xs sm:text-sm font-bold text-rose-600 dark:text-rose-400 font-mono block">
-                            {formatRupiah(stats.highestReceivable.client_receivable_remaining)}
+                        <div className="pt-1 border-t border-slate-200/50 dark:border-slate-700/50 flex items-baseline justify-between">
+                          <span className="text-[10px] uppercase font-bold text-slate-400">
+                            Sisa Piutang
                           </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            Belum Terbayar
+                          <span className="text-base font-black font-mono text-rose-600 dark:text-rose-400">
+                            {formatRupiah(stats.highestReceivable.client_receivable_remaining)}
                           </span>
                         </div>
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-rose-100 dark:border-rose-900/40 text-xs">
+                      <div className="flex items-center gap-1.5 text-xs pt-1">
                         <button
                           onClick={() => onOpenPayment(stats.highestReceivable)}
-                          className="flex-1 py-1.5 px-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:opacity-90 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                          className="flex-1 py-1.5 px-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs shadow-rose-600/25 active:scale-98"
                         >
                           <CreditCard className="w-3.5 h-3.5" />
-                          <span>Catat Pelunasan</span>
+                          <span>Catat Bayar</span>
                         </button>
 
                         <button
                           onClick={() => onOpenWhatsApp(stats.highestReceivable)}
-                          className="py-1.5 px-3 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                          title="Kirim Pesan Penagihan ke WA Klien"
+                          className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 transition cursor-pointer shadow-2xs"
+                          title="Follow Up WA"
                         >
-                          <WhatsAppIcon className="w-3.5 h-3.5" />
-                          <span>Follow Up WA</span>
+                          <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                         </button>
 
                         <button
                           onClick={() => onOpenDetail(stats.highestReceivable)}
-                          className="p-1.5 rounded-xl border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition cursor-pointer"
+                          className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
                           title="Lihat Detail Proyek"
                         >
-                          <ArrowUpRight className="w-4 h-4" />
+                          <ArrowUpRight className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
                   ) : (
                     // Inline Expanded Top 5 List
-                    <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                    <div className="space-y-1.5 pt-1 animate-in fade-in duration-200">
                       {stats.top5Receivables.map((p, idx) => {
                         const rank = getRankBadge(idx);
                         return (
                           <div 
                             key={p.project_id || p.id || idx}
-                            className="p-2.5 rounded-xl bg-white dark:bg-slate-900/90 border border-rose-100 dark:border-rose-900/40 flex items-center justify-between gap-2.5 text-xs hover:border-rose-300 dark:hover:border-rose-700 transition"
+                            className="p-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between gap-1.5 text-xs hover:border-rose-300 transition"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className={`w-5 h-5 rounded-md text-[10px] flex items-center justify-center shrink-0 ${rank.class}`}>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className={`w-4 h-4 rounded text-[9px] flex items-center justify-center shrink-0 ${rank.class}`}>
                                 {rank.label}
                               </span>
                               <div className="min-w-0">
                                 <h5 
                                   onClick={() => onOpenDetail(p)}
-                                  className="font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:underline"
+                                  className="font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:underline text-[11px]"
                                 >
                                   {p.project_name}
                                 </h5>
-                                <span className="text-[10px] text-slate-400 truncate block">
-                                  {p.client_name}
+                                <span className="font-mono font-bold text-rose-600 dark:text-rose-400 text-[10px] block">
+                                  {formatRupiah(p.client_receivable_remaining)}
                                 </span>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="font-mono font-bold text-rose-600 dark:text-rose-400 text-xs">
-                                {formatRupiah(p.client_receivable_remaining)}
-                              </span>
-                              
+                            <div className="flex items-center gap-1 shrink-0">
                               <button
                                 onClick={() => onOpenWhatsApp(p)}
-                                className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition cursor-pointer"
+                                className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-emerald-600 hover:bg-emerald-50 transition cursor-pointer"
                                 title="Follow Up WA"
                               >
                                 <WhatsAppIcon className="w-3 h-3" />
                               </button>
-
                               <button
                                 onClick={() => onOpenPayment(p)}
-                                className="p-1 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:opacity-80 transition cursor-pointer"
+                                className="p-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition cursor-pointer"
                                 title="Catat Bayar"
                               >
                                 <CreditCard className="w-3 h-3" />
@@ -900,55 +1128,52 @@ export default function FilamentCashflowAnalytics({
                   )}
                 </>
               ) : (
-                <div className="py-4 text-center text-xs text-slate-400">
+                <div className="py-6 text-center text-xs text-slate-400">
                   Tidak ada piutang klien yang belum tertagih.
                 </div>
               )}
-
             </div>
           )}
 
           {/* ============================================================= */}
-          {/* RADAR 2: MONITORING REVISI MAYOR (SCOPE CREEP GUARD)          */}
+          {/* RADAR 2: MONITORING REVISI MAYOR                              */}
           {/* ============================================================= */}
           {(radarFilter === 'all' || radarFilter === 'revisions') && (
-            <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/20 p-4 sm:p-4.5 shadow-2xs flex flex-col justify-between space-y-3 transition group">
-              
-              {/* Header with Top 5 trigger */}
-              <div className="flex items-center justify-between border-b border-amber-100 dark:border-amber-900/40 pb-2.5">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 flex flex-col justify-between space-y-3.5 transition">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="p-1.5 rounded-lg bg-amber-500 text-white shrink-0 shadow-2xs">
-                    <Clock className="w-4 h-4" />
-                  </span>
+                  <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 flex items-center justify-center shrink-0">
+                    <Clock className="w-3.5 h-3.5" />
+                  </div>
                   <div className="min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 block">
-                      MONITORING REVISI MAYOR
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      Cegah Revisi Berlebih (Maks 3x)
-                    </span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">
+                      Revisi Mayor
+                    </h4>
+                    <p className="text-[10px] text-slate-400 truncate">
+                      Maks 3x Revisi
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   {stats.top5Revisions.length > 1 && (
                     <button
                       onClick={() => toggleExpand('revisions')}
-                      className="px-2 py-1 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition cursor-pointer flex items-center gap-1"
-                      title="Buka / Tutup 5 Data Teratas di dalam kartu"
+                      className="px-2 py-0.5 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer flex items-center gap-0.5"
+                      title="Buka / Tutup 5 Data Teratas"
                     >
-                      <span>{expandedCards.revisions ? 'Ringkas' : '5 Teratas'}</span>
-                      {expandedCards.revisions ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      <span>{expandedCards.revisions ? 'Ringkas' : '5 Top'}</span>
+                      {expandedCards.revisions ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     </button>
                   )}
 
                   <button
                     onClick={() => setModalType('revisions')}
-                    className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer"
-                    title="Tampilkan Modal Detail 5 Revisi Teratas"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+                    title="Lihat Semua Revisi"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    <span>Lihat Semua</span>
                   </button>
                 </div>
               </div>
@@ -957,53 +1182,70 @@ export default function FilamentCashflowAnalytics({
               {stats.revisionActive ? (
                 <>
                   {!expandedCards.revisions ? (
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200">
-                              Prioritas Revisi
-                            </span>
-                            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                              {stats.revisionActive.project_name}
-                            </h4>
-                          </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                    <div className="space-y-3 flex-1 flex flex-col justify-between">
+                      {/* Project Info & Metric */}
+                      <div className="p-3 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 space-y-2">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase font-mono bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                            Prioritas
+                          </span>
+                          <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 truncate max-w-[120px]">
+                            {stats.revisionActive.revision_deal_status === 'DEAL_APPROVED' ? 'Deal Kompensasi' : 'Belum Kompensasi'}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h5 
+                            onClick={() => onOpenDetail(stats.revisionActive)}
+                            className="font-bold text-sm text-slate-900 dark:text-white truncate cursor-pointer hover:text-amber-600 transition"
+                            title={stats.revisionActive.project_name}
+                          >
+                            {stats.revisionActive.project_name}
+                          </h5>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
                             {stats.revisionActive.client_name}
                           </p>
                         </div>
 
-                        <div className="text-right shrink-0">
-                          <span className="px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-amber-100 text-amber-800 dark:bg-amber-900/80 dark:text-amber-300">
-                            Revisi {stats.revisionActive.current_revision || 0}/{stats.revisionActive.max_revisions || 3}
+                        <div className="pt-1 border-t border-slate-200/50 dark:border-slate-700/50 flex items-baseline justify-between">
+                          <span className="text-[10px] uppercase font-bold text-slate-400">
+                            Kuota Revisi
                           </span>
-                          <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">
-                            {stats.revisionActive.revision_deal_status === 'DEAL_APPROVED' ? 'Deal Disetujui' : 'Belum Deal'}
+                          <span className="text-base font-black font-mono text-amber-600 dark:text-amber-400">
+                            Revisi {stats.revisionActive.current_revision || 0} / {stats.revisionActive.max_revisions || 3}
                           </span>
                         </div>
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-amber-100 dark:border-amber-900/40 text-xs">
+                      <div className="flex items-center gap-1.5 text-xs pt-1">
                         <button
                           onClick={() => onOpenDetail(stats.revisionActive)}
-                          className="flex-1 py-1.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                          className="flex-1 py-1.5 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-xs shadow-amber-500/25 active:scale-98"
                         >
-                          <span>Kelola Kuota Revisi</span>
+                          <span>Kelola Revisi</span>
                           <ChevronRight className="w-3.5 h-3.5" />
                         </button>
 
                         <button
                           onClick={() => onOpenWhatsApp(stats.revisionActive)}
-                          className="py-1.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                          className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 transition cursor-pointer shadow-2xs"
+                          title="Diskusi Revisi WA"
                         >
-                          <WhatsAppIcon className="w-3.5 h-3.5" />
-                          <span>Diskusi Revisi</span>
+                          <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        </button>
+
+                        <button
+                          onClick={() => onOpenDetail(stats.revisionActive)}
+                          className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+                          title="Lihat Detail Proyek"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                    <div className="space-y-1.5 pt-1 animate-in fade-in duration-200">
                       {stats.top5Revisions.map((p, idx) => {
                         const rank = getRankBadge(idx);
                         const curRev = parseInt(p.current_revision) || 0;
@@ -1011,37 +1253,32 @@ export default function FilamentCashflowAnalytics({
                         return (
                           <div 
                             key={p.project_id || p.id || idx}
-                            className="p-2.5 rounded-xl bg-white dark:bg-slate-900/90 border border-amber-100 dark:border-amber-900/40 flex items-center justify-between gap-2.5 text-xs hover:border-amber-300 dark:hover:border-amber-700 transition"
+                            className="p-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between gap-1.5 text-xs hover:border-amber-300 transition"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className={`w-5 h-5 rounded-md text-[10px] flex items-center justify-center shrink-0 ${rank.class}`}>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className={`w-4 h-4 rounded text-[9px] flex items-center justify-center shrink-0 ${rank.class}`}>
                                 {rank.label}
                               </span>
                               <div className="min-w-0">
                                 <h5 
                                   onClick={() => onOpenDetail(p)}
-                                  className="font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:underline"
+                                  className="font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:underline text-[11px]"
                                 >
                                   {p.project_name}
                                 </h5>
-                                <span className="text-[10px] text-slate-400 truncate block">
-                                  {p.client_name}
+                                <span className="font-mono font-bold text-amber-600 text-[10px] block">
+                                  {curRev}/{maxRev} Rev
                                 </span>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
-                                {curRev}/{maxRev} Rev
-                              </span>
-                              <button
-                                onClick={() => onOpenDetail(p)}
-                                className="p-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition cursor-pointer"
-                                title="Kelola Revisi"
-                              >
-                                <ChevronRight className="w-3 h-3" />
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => onOpenDetail(p)}
+                              className="p-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition cursor-pointer"
+                              title="Kelola Revisi"
+                            >
+                              <ChevronRight className="w-3 h-3" />
+                            </button>
                           </div>
                         );
                       })}
@@ -1049,55 +1286,52 @@ export default function FilamentCashflowAnalytics({
                   )}
                 </>
               ) : (
-                <div className="py-4 text-center text-xs text-slate-400">
+                <div className="py-6 text-center text-xs text-slate-400">
                   Semua proyek dalam kuota revisi aman.
                 </div>
               )}
-
             </div>
           )}
 
           {/* ============================================================= */}
-          {/* RADAR 3: TARGET SERAH TERIMA DED & GAMBAR KERJA (DEADLINE)    */}
+          {/* RADAR 3: TARGET SERAH TERIMA DED & GAMBAR KERJA               */}
           {/* ============================================================= */}
           {(radarFilter === 'all' || radarFilter === 'deadlines') && (
-            <div className="rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 p-4 sm:p-4.5 shadow-2xs flex flex-col justify-between space-y-3 transition group">
-              
-              {/* Header with Top 5 trigger */}
-              <div className="flex items-center justify-between border-b border-blue-100 dark:border-blue-900/40 pb-2.5">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 flex flex-col justify-between space-y-3.5 transition">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="p-1.5 rounded-lg bg-blue-600 text-white shrink-0 shadow-2xs">
-                    <Calendar className="w-4 h-4" />
-                  </span>
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 flex items-center justify-center shrink-0">
+                    <Calendar className="w-3.5 h-3.5" />
+                  </div>
                   <div className="min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 block">
-                      TARGET SERAH TERIMA DED
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      Kawal Ketepatan Deadline Gambar
-                    </span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">
+                      Deadline DED
+                    </h4>
+                    <p className="text-[10px] text-slate-400 truncate">
+                      Kawal Serah Terima
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   {stats.top5Deadlines.length > 1 && (
                     <button
                       onClick={() => toggleExpand('deadlines')}
-                      className="px-2 py-1 rounded-lg text-[11px] font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition cursor-pointer flex items-center gap-1"
-                      title="Buka / Tutup 5 Data Teratas di dalam kartu"
+                      className="px-2 py-0.5 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer flex items-center gap-0.5"
+                      title="Buka / Tutup 5 Data Teratas"
                     >
-                      <span>{expandedCards.deadlines ? 'Ringkas' : '5 Teratas'}</span>
-                      {expandedCards.deadlines ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      <span>{expandedCards.deadlines ? 'Ringkas' : '5 Top'}</span>
+                      {expandedCards.deadlines ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     </button>
                   )}
 
                   <button
                     onClick={() => setModalType('deadlines')}
-                    className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer"
-                    title="Tampilkan Modal Detail 5 Deadline Terdekat"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+                    title="Lihat Semua Deadline"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    <span>Lihat Semua</span>
                   </button>
                 </div>
               </div>
@@ -1106,103 +1340,112 @@ export default function FilamentCashflowAnalytics({
               {stats.nearestDeadline ? (
                 <>
                   {!expandedCards.deadlines ? (
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-200 dark:bg-blue-900 text-blue-900 dark:text-blue-200">
-                              Target Terdekat
-                            </span>
-                            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                              {stats.nearestDeadline.project_name}
-                            </h4>
-                          </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                            {stats.nearestDeadline.client_name} • Target: <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{stats.nearestDeadline.deadline_date || '-'}</span>
-                          </p>
-                        </div>
-
-                        <div className="text-right shrink-0">
+                    <div className="space-y-3 flex-1 flex flex-col justify-between">
+                      {/* Project Info & Metric */}
+                      <div className="p-3 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 space-y-2">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase font-mono bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                            Target Terdekat
+                          </span>
                           {(() => {
                             const badge = formatDaysBadge(stats.nearestDeadline.calculatedDaysLeft);
                             return (
-                              <span className={`px-2 py-0.5 rounded text-[11px] font-bold font-mono ${badge.class}`}>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black font-mono ${badge.class}`}>
                                 {badge.text}
                               </span>
                             );
                           })()}
-                          <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">
-                            Progres: {stats.nearestDeadline.progress_percent || 0}%
-                          </span>
+                        </div>
+
+                        <div>
+                          <h5 
+                            onClick={() => onOpenDetail(stats.nearestDeadline)}
+                            className="font-bold text-sm text-slate-900 dark:text-white truncate cursor-pointer hover:text-blue-600 transition"
+                            title={stats.nearestDeadline.project_name}
+                          >
+                            {stats.nearestDeadline.project_name}
+                          </h5>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                            {stats.nearestDeadline.client_name} &bull; {stats.nearestDeadline.deadline_date || '-'}
+                          </p>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="pt-1 border-t border-slate-200/50 dark:border-slate-700/50 space-y-1">
+                          <div className="flex justify-between text-[10px] font-semibold text-slate-400">
+                            <span>Progres DED</span>
+                            <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{stats.nearestDeadline.progress_percent || 0}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-200/80 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-blue-600 rounded-full transition-all duration-500" 
+                              style={{ width: `${Math.min(100, Math.max(0, stats.nearestDeadline.progress_percent || 0))}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
 
-                      {/* Progress bar */}
-                      <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-600 rounded-full transition-all duration-500" 
-                          style={{ width: `${Math.min(100, stats.nearestDeadline.progress_percent || 0)}%` }}
-                        />
-                      </div>
-
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-blue-100 dark:border-blue-900/40 text-xs">
+                      <div className="flex items-center gap-1.5 text-xs pt-1">
                         <button
                           onClick={() => onOpenDetail(stats.nearestDeadline)}
-                          className="flex-1 py-1.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                          className="flex-1 py-1.5 px-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs shadow-blue-600/25 active:scale-98"
                         >
                           <FileCheck className="w-3.5 h-3.5" />
-                          <span>Rincian & Gambar DED</span>
+                          <span>Rincian DED</span>
                         </button>
 
                         <button
                           onClick={() => onOpenWhatsApp(stats.nearestDeadline)}
-                          className="py-1.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                          className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 transition cursor-pointer shadow-2xs"
+                          title="Koordinasi WA"
                         >
-                          <WhatsAppIcon className="w-3.5 h-3.5" />
-                          <span>Koordinasi WA</span>
+                          <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        </button>
+
+                        <button
+                          onClick={() => onOpenDetail(stats.nearestDeadline)}
+                          className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+                          title="Lihat Detail Proyek"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                    <div className="space-y-1.5 pt-1 animate-in fade-in duration-200">
                       {stats.top5Deadlines.map((p, idx) => {
                         const rank = getRankBadge(idx);
                         const badge = formatDaysBadge(p.calculatedDaysLeft);
                         return (
                           <div 
                             key={p.project_id || p.id || idx}
-                            className="p-2.5 rounded-xl bg-white dark:bg-slate-900/90 border border-blue-100 dark:border-blue-900/40 flex items-center justify-between gap-2.5 text-xs hover:border-blue-300 dark:hover:border-blue-700 transition"
+                            className="p-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between gap-1.5 text-xs hover:border-blue-300 transition"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className={`w-5 h-5 rounded-md text-[10px] flex items-center justify-center shrink-0 ${rank.class}`}>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className={`w-4 h-4 rounded text-[9px] flex items-center justify-center shrink-0 ${rank.class}`}>
                                 {rank.label}
                               </span>
                               <div className="min-w-0">
                                 <h5 
                                   onClick={() => onOpenDetail(p)}
-                                  className="font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:underline"
+                                  className="font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:underline text-[11px]"
                                 >
                                   {p.project_name}
                                 </h5>
-                                <span className="text-[10px] text-slate-400 truncate block">
-                                  {p.client_name} • {p.deadline_date || '-'}
+                                <span className={`px-1 rounded text-[9px] font-mono font-bold ${badge.class}`}>
+                                  {badge.text}
                                 </span>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] ${badge.class}`}>
-                                {badge.text}
-                              </span>
-                              <button
-                                onClick={() => onOpenDetail(p)}
-                                className="p-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition cursor-pointer"
-                                title="Rincian Proyek"
-                              >
-                                <ArrowUpRight className="w-3 h-3" />
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => onOpenDetail(p)}
+                              className="p-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition cursor-pointer"
+                              title="Rincian Proyek"
+                            >
+                              <ArrowUpRight className="w-3 h-3" />
+                            </button>
                           </div>
                         );
                       })}
@@ -1210,11 +1453,10 @@ export default function FilamentCashflowAnalytics({
                   )}
                 </>
               ) : (
-                <div className="py-4 text-center text-xs text-slate-400">
+                <div className="py-6 text-center text-xs text-slate-400">
                   Belum ada tenggat waktu serah terima yang tercatat.
                 </div>
               )}
-
             </div>
           )}
 
@@ -1222,43 +1464,41 @@ export default function FilamentCashflowAnalytics({
           {/* RADAR 4: PENGENDALIAN KAS TALANGAN & HONOR SUBKON              */}
           {/* ============================================================= */}
           {(radarFilter === 'all' || radarFilter === 'subkons') && (
-            <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 p-4 sm:p-4.5 shadow-2xs flex flex-col justify-between space-y-3 transition group">
-              
-              {/* Header with Top 5 trigger */}
-              <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-900/40 pb-2.5">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 flex flex-col justify-between space-y-3.5 transition">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="p-1.5 rounded-lg bg-emerald-600 text-white shrink-0 shadow-2xs">
-                    <Users className="w-4 h-4" />
-                  </span>
+                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <Users className="w-3.5 h-3.5" />
+                  </div>
                   <div className="min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block">
-                      KAS TALANGAN & HONOR SUBKON
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      Cegah Boncos Bayar Tim Sebelum DP
-                    </span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">
+                      Honor Subkon
+                    </h4>
+                    <p className="text-[10px] text-slate-400 truncate">
+                      Kewajiban Tim
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   {stats.top5Subkons.length > 1 && (
                     <button
                       onClick={() => toggleExpand('subkons')}
-                      className="px-2 py-1 rounded-lg text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition cursor-pointer flex items-center gap-1"
-                      title="Buka / Tutup 5 Data Teratas di dalam kartu"
+                      className="px-2 py-0.5 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer flex items-center gap-0.5"
+                      title="Buka / Tutup 5 Data Teratas"
                     >
-                      <span>{expandedCards.subkons ? 'Ringkas' : '5 Teratas'}</span>
-                      {expandedCards.subkons ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      <span>{expandedCards.subkons ? 'Ringkas' : '5 Top'}</span>
+                      {expandedCards.subkons ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     </button>
                   )}
 
                   <button
                     onClick={() => setModalType('subkons')}
-                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer"
-                    title="Tampilkan Modal Detail 5 Honor Teratas"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+                    title="Lihat Semua Honor"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    <span>Lihat Semua</span>
                   </button>
                 </div>
               </div>
@@ -1267,89 +1507,101 @@ export default function FilamentCashflowAnalytics({
               {stats.highestSubkonPayable ? (
                 <>
                   {!expandedCards.subkons ? (
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-200 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200">
-                              Komitmen Terbuka
-                            </span>
-                            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                              {stats.highestSubkonPayable.project_name}
-                            </h4>
-                          </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                            Drafter & Analisis • Klien: {stats.highestSubkonPayable.client_name}
+                    <div className="space-y-3 flex-1 flex flex-col justify-between">
+                      {/* Project Info & Metric */}
+                      <div className="p-3 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 space-y-2">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase font-mono bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                            Komitmen
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                            Belum Dicairkan
+                          </span>
+                        </div>
+
+                        <div>
+                          <h5 
+                            onClick={() => onOpenDetail(stats.highestSubkonPayable)}
+                            className="font-bold text-sm text-slate-900 dark:text-white truncate cursor-pointer hover:text-emerald-600 transition"
+                            title={stats.highestSubkonPayable.project_name}
+                          >
+                            {stats.highestSubkonPayable.project_name}
+                          </h5>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                            Klien: {stats.highestSubkonPayable.client_name}
                           </p>
                         </div>
 
-                        <div className="text-right shrink-0">
-                          <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono block">
-                            {formatRupiah(stats.highestSubkonPayable.team_payable_remaining)}
+                        <div className="pt-1 border-t border-slate-200/50 dark:border-slate-700/50 flex items-baseline justify-between">
+                          <span className="text-[10px] uppercase font-bold text-slate-400">
+                            Sisa Hak Honor
                           </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            Sisa Hak Tim
+                          <span className="text-base font-black font-mono text-emerald-600 dark:text-emerald-400">
+                            {formatRupiah(stats.highestSubkonPayable.team_payable_remaining)}
                           </span>
                         </div>
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-emerald-100 dark:border-emerald-900/40 text-xs">
+                      <div className="flex items-center gap-1.5 text-xs pt-1">
                         <button
                           onClick={() => onOpenDetail(stats.highestSubkonPayable)}
-                          className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                          className="flex-1 py-1.5 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs shadow-emerald-600/25 active:scale-98"
                         >
                           <CreditCard className="w-3.5 h-3.5" />
-                          <span>Pencairan Honor Tim</span>
+                          <span>Cairkan Honor</span>
                         </button>
 
                         <button
                           onClick={() => onOpenWhatsApp(stats.highestSubkonPayable)}
-                          className="py-1.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                          className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 transition cursor-pointer shadow-2xs"
+                          title="Hubungi Subkon WA"
                         >
-                          <WhatsAppIcon className="w-3.5 h-3.5" />
-                          <span>Hubungi Klien</span>
+                          <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        </button>
+
+                        <button
+                          onClick={() => onOpenDetail(stats.highestSubkonPayable)}
+                          className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+                          title="Lihat Detail Proyek"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                    <div className="space-y-1.5 pt-1 animate-in fade-in duration-200">
                       {stats.top5Subkons.map((p, idx) => {
                         const rank = getRankBadge(idx);
                         return (
                           <div 
                             key={p.project_id || p.id || idx}
-                            className="p-2.5 rounded-xl bg-white dark:bg-slate-900/90 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-between gap-2.5 text-xs hover:border-emerald-300 dark:hover:border-emerald-700 transition"
+                            className="p-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between gap-1.5 text-xs hover:border-emerald-300 transition"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className={`w-5 h-5 rounded-md text-[10px] flex items-center justify-center shrink-0 ${rank.class}`}>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className={`w-4 h-4 rounded text-[9px] flex items-center justify-center shrink-0 ${rank.class}`}>
                                 {rank.label}
                               </span>
                               <div className="min-w-0">
                                 <h5 
                                   onClick={() => onOpenDetail(p)}
-                                  className="font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:underline"
+                                  className="font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:underline text-[11px]"
                                 >
                                   {p.project_name}
                                 </h5>
-                                <span className="text-[10px] text-slate-400 truncate block">
-                                  Klien: {p.client_name}
+                                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[10px] block">
+                                  {formatRupiah(p.team_payable_remaining)}
                                 </span>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                                {formatRupiah(p.team_payable_remaining)}
-                              </span>
-                              <button
-                                onClick={() => onOpenDetail(p)}
-                                className="p-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer"
-                                title="Pencairan Honor"
-                              >
-                                <ArrowUpRight className="w-3 h-3" />
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => onOpenDetail(p)}
+                              className="p-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer"
+                              title="Pencairan Honor"
+                            >
+                              <ArrowUpRight className="w-3 h-3" />
+                            </button>
                           </div>
                         );
                       })}
@@ -1357,11 +1609,10 @@ export default function FilamentCashflowAnalytics({
                   )}
                 </>
               ) : (
-                <div className="py-4 text-center text-xs text-slate-400">
+                <div className="py-6 text-center text-xs text-slate-400">
                   Tidak ada kewajiban honor tim/subkon yang tertahan.
                 </div>
               )}
-
             </div>
           )}
 
@@ -1406,7 +1657,37 @@ export default function FilamentCashflowAnalytics({
               </button>
             </div>
 
-            {/* Modal Items List: Top 5 */}
+            {/* Quick Financial Snapshot for Stage Drilldown */}
+            {modalConfig.type === 'stage' && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">Jumlah Proyek</span>
+                  <span className="font-mono font-black text-slate-900 dark:text-white text-sm">
+                    {modalConfig.data.length} Proyek
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">Total Akumulasi SPK</span>
+                  <span className="font-mono font-black text-slate-900 dark:text-white text-sm">
+                    {formatRupiah(modalConfig.totalNominal || 0)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">Kas Diterima</span>
+                  <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                    {formatRupiah(modalConfig.data.reduce((sum, p) => sum + (parseFloat(p.total_paid_by_client) || 0), 0))}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">Sisa Piutang Klien</span>
+                  <span className="font-mono font-black text-rose-600 dark:text-rose-400 text-sm">
+                    {formatRupiah(modalConfig.data.reduce((sum, p) => sum + (parseFloat(p.client_receivable_remaining) || 0), 0))}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Items List */}
             <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
               {modalConfig.data.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400">
@@ -1414,7 +1695,18 @@ export default function FilamentCashflowAnalytics({
                 </div>
               ) : (
                 modalConfig.data.map((item, idx) => {
-                  const rank = getRankBadge(idx);
+                  const rank = modalConfig.type === 'stage'
+                    ? { label: `${idx + 1}`, class: 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-900/60 font-bold' }
+                    : getRankBadge(idx);
+
+                  const itemStageKey = (() => {
+                    let step = item.workflow_step || 'KONTRAK';
+                    if (step === 'KONTRAK_DP') step = 'KONTRAK';
+                    if (step === 'PEMBAYARAN_AKHIR') step = 'PELUNASAN';
+                    if (!['KONTRAK', 'PENGERJAAN', 'REVISI', 'PELUNASAN', 'DONE'].includes(step)) step = 'PENGERJAAN';
+                    return step;
+                  })();
+
                   return (
                     <div 
                       key={item.project_id || item.id || idx}
@@ -1427,7 +1719,7 @@ export default function FilamentCashflowAnalytics({
                         </span>
 
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h4 
                               onClick={() => {
                                 setModalType(null);
@@ -1440,6 +1732,14 @@ export default function FilamentCashflowAnalytics({
                             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                               {item.project_code || `PRJ-${item.id}`}
                             </span>
+                            {modalConfig.stageKey === 'ALL' && (
+                              <span 
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded text-white shrink-0"
+                                style={{ backgroundColor: stats.stages[itemStageKey]?.color || '#6366F1' }}
+                              >
+                                {stats.stages[itemStageKey]?.label || itemStageKey}
+                              </span>
+                            )}
                           </div>
                           <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
                             Klien: <strong className="text-slate-700 dark:text-slate-300">{item.client_name}</strong> {item.client_phone ? `(${item.client_phone})` : ''}
@@ -1500,10 +1800,71 @@ export default function FilamentCashflowAnalytics({
                               </span>
                             </>
                           )}
+
+                          {modalConfig.type === 'stage' && (
+                            <>
+                              <span className="font-mono font-bold text-slate-900 dark:text-white text-xs block">
+                                SPK: {formatRupiah(item.total_contract_value)}
+                              </span>
+                              {(parseFloat(item.client_receivable_remaining) || 0) > 0 ? (
+                                <span className="font-mono font-semibold text-rose-600 dark:text-rose-400 text-[10px] block">
+                                  Piutang: {formatRupiah(item.client_receivable_remaining)}
+                                </span>
+                              ) : (
+                                <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 text-[10px] block">
+                                  Lunas 100%
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-400 block mt-0.5">
+                                Progres: <strong className="text-slate-700 dark:text-slate-300">{item.progress_percent || 0}%</strong>
+                              </span>
+                            </>
+                          )}
                         </div>
 
                         {/* Direct 1-Click Action Buttons */}
                         <div className="flex items-center gap-1.5">
+                          {modalConfig.type === 'stage' && (
+                            <>
+                              {(parseFloat(item.client_receivable_remaining) || 0) > 0 && (
+                                <button
+                                  onClick={() => {
+                                    setModalType(null);
+                                    onOpenPayment(item);
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:opacity-90 transition flex items-center gap-1 cursor-pointer"
+                                  title="Catat Pembayaran"
+                                >
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">Bayar</span>
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => {
+                                  setModalType(null);
+                                  onOpenWhatsApp(item);
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition flex items-center gap-1 cursor-pointer"
+                                title="Kirim Pesan WhatsApp"
+                              >
+                                <WhatsAppIcon className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">WhatsApp</span>
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setModalType(null);
+                                  onOpenDetail(item);
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition flex items-center gap-1 cursor-pointer"
+                                title="Buka Detail Proyek"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Detail</span>
+                              </button>
+                            </>
+                          )}
                           {modalConfig.type === 'receivables' && (
                             <>
                               <button
@@ -1635,7 +1996,9 @@ export default function FilamentCashflowAnalytics({
             {/* Modal Footer */}
             <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
               <span className="text-slate-400 font-mono">
-                Menampilkan maksimal 5 data prioritas tertinggi
+                {modalConfig.type === 'stage'
+                  ? `Menampilkan total ${modalConfig.data.length} proyek pada tahap ${modalConfig.stageLabel || ''}`
+                  : 'Menampilkan maksimal 5 data prioritas tertinggi'}
               </span>
               <button
                 type="button"

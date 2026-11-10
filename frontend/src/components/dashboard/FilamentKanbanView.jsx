@@ -8,7 +8,7 @@ import {
   Pencil, 
   Trash2
 } from 'lucide-react';
-import { formatRupiah, getInitials } from '../../utils/format';
+import { formatRupiah, calcPercent } from '../../utils/format';
 import { apiUpdateWorkflowStep } from '../../services/api';
 
 const WhatsAppIcon = ({ className = "w-3.5 h-3.5" }) => (
@@ -103,13 +103,13 @@ export default function FilamentKanbanView({
     try {
       const res = await apiUpdateWorkflowStep(projId, targetColumnKey);
       if (res.success) {
-        showToast(res.message || 'Tahapan alur berhasil dipindahkan!');
+        if (showToast) showToast(res.message || 'Tahapan alur berhasil dipindahkan!');
         if (onRefresh) onRefresh();
       } else {
-        showToast(res.message || 'Gagal memindahkan tahapan.', 'danger');
+        if (showToast) showToast(res.message || 'Gagal memindahkan tahapan.', 'danger');
       }
-    } catch (err) {
-      showToast('Terjadi kesalahan koneksi sistem.', 'danger');
+    } catch {
+      if (showToast) showToast('Terjadi kesalahan koneksi sistem.', 'danger');
     } finally {
       setMovingId(null);
     }
@@ -191,7 +191,7 @@ export default function FilamentKanbanView({
                         {/* Project & Client */}
                         <div>
                           <h5 
-                            onClick={() => onOpenDetail(p)}
+                            onClick={() => onOpenDetail && onOpenDetail(p)}
                             className="font-bold text-xs text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition line-clamp-2"
                             title={p.project_name}
                           >
@@ -208,7 +208,11 @@ export default function FilamentKanbanView({
                             <span>SPK:</span>
                             <span className="font-bold text-slate-900 dark:text-white">{formatRupiah(contract)}</span>
                           </div>
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                            <span>Masuk:</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatRupiah(paid)} ({paidPercent}%)</span>
+                          </div>
+                          <div className="flex justify-between items-center pt-0.5 border-t border-slate-200/60 dark:border-slate-700/60">
                             <span className="text-slate-500">Sisa Tagihan:</span>
                             <span className={`font-bold ${receivable > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                               {receivable > 0 ? formatRupiah(receivable) : 'Lunas'}
@@ -260,7 +264,7 @@ export default function FilamentKanbanView({
                         {/* Quick Card Action Toolbar */}
                         <div className="flex items-center justify-between pt-1 text-slate-400">
                           <button
-                            onClick={() => onOpenDetail(p)}
+                            onClick={() => onOpenDetail && onOpenDetail(p)}
                             className="p-1 rounded hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer"
                             title="Rincian Proyek"
                           >
@@ -269,7 +273,7 @@ export default function FilamentKanbanView({
 
                           {canEdit && receivable > 0 && (
                             <button
-                              onClick={() => onOpenPayment(p)}
+                              onClick={() => onOpenPayment && onOpenPayment(p)}
                               className="p-1 rounded hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
                               title="Catat Pembayaran"
                             >
@@ -278,7 +282,7 @@ export default function FilamentKanbanView({
                           )}
 
                           <button
-                            onClick={() => onOpenWhatsApp(p)}
+                            onClick={() => onOpenWhatsApp && onOpenWhatsApp(p)}
                             className="p-1 rounded hover:text-emerald-600 dark:hover:text-emerald-400 transition cursor-pointer"
                             title="Hubungi WA"
                           >

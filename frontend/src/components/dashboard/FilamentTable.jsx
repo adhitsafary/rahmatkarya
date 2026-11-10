@@ -27,6 +27,8 @@ export default function FilamentTable({
   loading,
   currentFilter,
   setFilter,
+  selectedWorkflowStage = null,
+  onClearWorkflowStage,
   searchQuery = '',
   setSearchQuery,
   viewMode,
@@ -41,6 +43,24 @@ export default function FilamentTable({
   showToast
 }) {
   const [selectedSort, setSelectedSort] = useState('default');
+
+  const normalizeStep = (step) => {
+    if (!step) return 'KONTRAK';
+    const s = step.toUpperCase();
+    if (s.includes('KONTRAK') || s.includes('DP')) return 'KONTRAK';
+    if (s.includes('REVISI')) return 'REVISI';
+    if (s.includes('PELUNASAN') || s.includes('AKHIR')) return 'PELUNASAN';
+    if (s.includes('DONE') || s.includes('SELESAI')) return 'DONE';
+    return 'PENGERJAAN';
+  };
+
+  const stageMeta = {
+    KONTRAK: { label: 'Kontrak & DP', color: '#3B82F6', badge: 'bg-blue-500 text-white' },
+    PENGERJAAN: { label: 'Pengerjaan Desain', color: '#6366F1', badge: 'bg-indigo-500 text-white' },
+    REVISI: { label: 'Revisi Mayor', color: '#F59E0B', badge: 'bg-amber-500 text-white' },
+    PELUNASAN: { label: 'Pelunasan', color: '#EC4899', badge: 'bg-pink-500 text-white' },
+    DONE: { label: 'Selesai (Done)', color: '#10B981', badge: 'bg-emerald-500 text-white' }
+  };
 
   // Dynamic filter counts
   const counts = useMemo(() => {
@@ -72,18 +92,23 @@ export default function FilamentTable({
     }), { contract: 0, paidClient: 0, receivable: 0, teamHonor: 0, paidTeam: 0, payableTeam: 0 });
   }, [projects]);
 
-  // Sorted projects if sort dropdown is used
+  // Sorted and filtered projects (supporting stage selection from pie chart)
   const sortedProjects = useMemo(() => {
     let list = [...projects];
+    if (selectedWorkflowStage) {
+      list = list.filter(p => normalizeStep(p.workflow_step) === selectedWorkflowStage);
+    }
     if (selectedSort === 'highest_contract') {
       list.sort((a, b) => (parseFloat(b.total_contract_value) || 0) - (parseFloat(a.total_contract_value) || 0));
+    } else if (selectedSort === 'lowest_contract') {
+      list.sort((a, b) => (parseFloat(a.total_contract_value) || 0) - (parseFloat(b.total_contract_value) || 0));
     } else if (selectedSort === 'highest_receivable') {
       list.sort((a, b) => (parseFloat(b.client_receivable_remaining) || 0) - (parseFloat(a.client_receivable_remaining) || 0));
     } else if (selectedSort === 'newest') {
       list.sort((a, b) => (b.project_id || b.id || 0) - (a.project_id || a.id || 0));
     }
     return list;
-  }, [projects, selectedSort]);
+  }, [projects, selectedSort, selectedWorkflowStage]);
 
   return (
     <div className="space-y-3">
@@ -114,6 +139,29 @@ export default function FilamentTable({
           );
         })}
       </div>
+
+      {/* Active Stage Color Filter Banner from Pie Chart */}
+      {selectedWorkflowStage && (
+        <div className="flex items-center justify-between p-2.5 px-3.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs animate-in fade-in duration-150">
+          <div className="flex items-center gap-2">
+            <span 
+              className="w-2.5 h-2.5 rounded-full shrink-0" 
+              style={{ backgroundColor: stageMeta[selectedWorkflowStage]?.color || '#6366F1' }}
+            ></span>
+            <span className="text-slate-800 dark:text-slate-200 font-medium">
+              Filter Warna Alur: <strong className="font-bold text-slate-900 dark:text-white">{stageMeta[selectedWorkflowStage]?.label || selectedWorkflowStage}</strong> 
+              <span className="ml-1 text-slate-500 font-mono">({sortedProjects.length} Proyek)</span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClearWorkflowStage}
+            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-bold transition cursor-pointer flex items-center gap-1 text-[11px]"
+          >
+            ✕ Tampilkan Semua Warna
+          </button>
+        </div>
+      )}
 
       {/* ================================================================= */}
       {/* 2. SUB-FILTER & SEARCH ROW - Compact console layout               */}
@@ -155,8 +203,9 @@ export default function FilamentTable({
               onChange={(e) => setSelectedSort(e.target.value)}
               className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-2.5 pr-7 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
             >
-              <option value="default">Semua Status</option>
-              <option value="highest_contract">Kontrak Terbesar</option>
+              <option value="default">Urutan Default</option>
+              <option value="highest_contract">Kontrak Terbesar &rarr; Terkecil</option>
+              <option value="lowest_contract">Kontrak Terkecil &rarr; Terbesar</option>
               <option value="highest_receivable">Piutang Terbesar</option>
               <option value="newest">Proyek Terbaru</option>
             </select>
@@ -444,18 +493,26 @@ export default function FilamentTable({
                       </p>
                     </div>
 
-                    {/* Status Pill Badge */}
-                    {isSettled ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        Lunas
+                    {/* Status & Workflow Stage Badges */}
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      {isSettled ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          Lunas
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                          Belum Lunas
+                        </span>
+                      )}
+                      <span 
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-white shadow-2xs shrink-0"
+                        style={{ backgroundColor: stageMeta[normalizeStep(p.workflow_step)]?.color || '#6366F1' }}
+                      >
+                        {stageMeta[normalizeStep(p.workflow_step)]?.label || 'Alur'}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60 shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                        Belum Lunas
-                      </span>
-                    )}
+                    </div>
                   </div>
 
                   {/* Financial Grid */}

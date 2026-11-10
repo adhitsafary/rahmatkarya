@@ -25,6 +25,7 @@ import {
   apiAddTeamPayment,
   apiAddRevision,
   apiApproveRevisionDeal,
+  apiUpdateWorkflowStep,
   getEndpoint
 } from '../../services/api';
 import { formatRupiah, formatDate, formatNumberWithDots, parseNumberFromDots } from '../../utils/format';
@@ -216,6 +217,30 @@ export default function FilamentProjectDetailPage({
 
   const currentStepIndex = workflowSteps.findIndex(s => s.key === project.workflow_step);
   const activeStepIdx = currentStepIndex >= 0 ? currentStepIndex : 1;
+
+  // Handle Interactive Stepper Click
+  const handleStepClick = async (targetStep) => {
+    if (!canEdit) return;
+    if (targetStep.key === project.workflow_step) return;
+
+    const confirmMsg = targetStep.key === 'DONE'
+      ? `Selesaikan proyek "${project.project_name}" menjadi status "Selesai (Deal)" (Progres 100%)?`
+      : `Ubah tahapan alur kerja proyek menjadi "${targetStep.label}"?`;
+
+    if (window.confirm(confirmMsg)) {
+      try {
+        const res = await apiUpdateWorkflowStep(project.project_id || project.id || projectId, targetStep.key);
+        if (res.success) {
+          if (showToast) showToast(res.message || `Tahapan alur kerja berhasil diubah ke "${targetStep.label}"!`);
+          fetchDetail();
+        } else {
+          if (showToast) showToast(res.message || 'Gagal mengubah tahapan alur kerja', 'danger');
+        }
+      } catch (err) {
+        if (showToast) showToast('Gagal menghubungi server', 'danger');
+      }
+    }
+  };
 
   // Render Revision Section Component
   const renderRevisionSection = () => (
@@ -815,10 +840,13 @@ export default function FilamentProjectDetailPage({
           </div>
         </div>
 
-        {/* Modern & Sleek Workflow Stepper (Replacing the 5 huge blocky buttons) */}
+        {/* Modern & Sleek Workflow Stepper (Interactive) */}
         <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-400 uppercase tracking-wider text-[10px] font-bold">Tahapan Alur Kerja Proyek</span>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 uppercase tracking-wider text-[10px] font-bold">Tahapan Alur Kerja Proyek</span>
+              <span className="text-[10px] text-slate-400 hidden sm:inline font-mono">(Klik langkah untuk berpindah status)</span>
+            </div>
             <span className="font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200/60 dark:border-blue-900/40">
               Progres: {project.progress_percent || 0}% Selesai
             </span>
@@ -841,13 +869,20 @@ export default function FilamentProjectDetailPage({
                 const isPast = idx < activeStepIdx;
                 const isCurrent = idx === activeStepIdx;
                 return (
-                  <div key={step.key} className="flex flex-col items-center text-center">
+                  <button 
+                    key={step.key} 
+                    type="button"
+                    disabled={!canEdit}
+                    onClick={() => handleStepClick(step)}
+                    className="flex flex-col items-center text-center group cursor-pointer transition-transform hover:scale-105 focus:outline-none"
+                    title={`Klik untuk ubah tahapan ke: ${step.label}`}
+                  >
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                       isCurrent
                         ? 'bg-blue-600 text-white ring-4 ring-blue-100 dark:ring-blue-950/80 shadow-xs scale-105'
                         : isPast
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-400'
+                        ? 'bg-blue-600 text-white group-hover:bg-blue-700'
+                        : 'bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-400 group-hover:border-blue-400 group-hover:text-blue-500'
                     }`}>
                       {isPast ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : step.stepNumber}
                     </div>
@@ -856,15 +891,35 @@ export default function FilamentProjectDetailPage({
                         ? 'text-blue-600 dark:text-blue-400 font-extrabold'
                         : isPast
                         ? 'text-slate-700 dark:text-slate-300 font-bold'
-                        : 'text-slate-400 dark:text-slate-600 font-medium'
+                        : 'text-slate-400 dark:text-slate-600 font-medium group-hover:text-slate-700 dark:group-hover:text-slate-200'
                     }`}>
                       {step.label}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </div>
+
+          {/* Prompt banner if project is 100% paid but not marked DONE yet */}
+          {remainingReceivable <= 0 && project.workflow_step !== 'DONE' && (
+            <div className="mt-2.5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs animate-in fade-in">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 animate-ping"></span>
+                <span className="font-semibold text-emerald-900 dark:text-emerald-200">
+                  🎉 Pembayaran Klien Sudah Lunas 100%! Anda dapat menandai proyek ini sebagai Selesai.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleStepClick(workflowSteps[4])}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shrink-0 cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Selesaikan Proyek (Deal)</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

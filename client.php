@@ -22,6 +22,11 @@ $currentUser = getCurrentUser();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dashboard Klien - Rahmat-Karya</title>
+    <!-- Favicon & Brand Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png?v=4">
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=4">
+    <link rel="shortcut icon" href="./favicon.ico?v=4">
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=4">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
