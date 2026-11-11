@@ -108,6 +108,29 @@ export default function FilamentProjectDetailPage({
     );
   }
 
+  if (!loading && (!detail || !detail.project)) {
+    return (
+      <div className="min-h-[50vh] p-8 sm:p-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center flex flex-col items-center justify-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-900/60 flex items-center justify-center text-amber-600 dark:text-amber-400">
+          <FileText className="w-6 h-6" />
+        </div>
+        <div>
+          <h3 className="text-base font-black text-slate-900 dark:text-white">Proyek Tidak Ditemukan</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+            Data rincian proyek dengan ID #{projectId} tidak ditemukan di database atau telah dihapus.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-xs font-bold transition cursor-pointer shadow-xs"
+        >
+          &larr; Kembali ke Daftar Proyek
+        </button>
+      </div>
+    );
+  }
+
   const project = detail?.project || {};
   const clientPayments = detail?.client_payments || [];
   const teamMembers = detail?.team_members || [];
@@ -902,7 +925,7 @@ export default function FilamentProjectDetailPage({
           </div>
 
           {/* Prompt banner if project is 100% paid but not marked DONE yet */}
-          {remainingReceivable <= 0 && project.workflow_step !== 'DONE' && (
+          {clientReceivable <= 0 && contractVal > 0 && project.workflow_step !== 'DONE' && (
             <div className="mt-2.5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs animate-in fade-in">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 animate-ping"></span>

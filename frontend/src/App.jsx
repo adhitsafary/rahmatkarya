@@ -651,30 +651,35 @@ export default function App() {
           
           {/* DEDICATED FULL-PAGE PROJECT DETAIL */}
           {activeTab === 'project-detail' && detailProjectId ? (
-            <FilamentProjectDetailPage
-              projectId={detailProjectId}
-              onBack={() => {
-                const returnTab = previousTab && previousTab !== 'project-detail' ? previousTab : 'projects';
-                handleTabChange(returnTab);
-              }}
-              onOpenPayment={(p) => {
-                setSelectedProject(p);
-                setPaymentModalOpen(true);
-              }}
-              onOpenWhatsApp={(p) => {
-                setSelectedProject(p);
-                setWhatsAppModalOpen(true);
-              }}
-              onOpenEdit={(p) => {
-                handleOpenEditProject(p);
-              }}
-              onOpenDelete={(p) => {
-                handleOpenDeleteProject(p);
-              }}
-              canEdit={canEdit}
-              showToast={showToast}
-              refreshTrigger={detailRefreshTrigger}
-            />
+            <ErrorBoundary 
+              onReset={() => setDetailRefreshTrigger(t => t + 1)} 
+              onGoHome={() => handleTabChange('projects')}
+            >
+              <FilamentProjectDetailPage
+                projectId={detailProjectId}
+                onBack={() => {
+                  const returnTab = previousTab && previousTab !== 'project-detail' ? previousTab : 'projects';
+                  handleTabChange(returnTab);
+                }}
+                onOpenPayment={(p) => {
+                  setSelectedProject(p);
+                  setPaymentModalOpen(true);
+                }}
+                onOpenWhatsApp={(p) => {
+                  setSelectedProject(p);
+                  setWhatsAppModalOpen(true);
+                }}
+                onOpenEdit={(p) => {
+                  handleOpenEditProject(p);
+                }}
+                onOpenDelete={(p) => {
+                  handleOpenDeleteProject(p);
+                }}
+                canEdit={canEdit}
+                showToast={showToast}
+                refreshTrigger={detailRefreshTrigger}
+              />
+            </ErrorBoundary>
           ) : activeTab === 'users' ? (
             <FilamentUserManagement 
               currentUser={currentUser} 

@@ -28,9 +28,9 @@ export default function FilamentDailyBriefingModal({
   onSelectTab,
   appSettings
 }) {
-  if (!isOpen) return null;
-
   const [dontShowAgainToday, setDontShowAgainToday] = useState(false);
+
+  if (!isOpen) return null;
 
   const summary = data?.summary || {
     total_alerts: 0,
