@@ -43,26 +43,28 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
       {/* ============================================================== */}
       {/* SISI KIRI: Banner Visual & Pesan Sambutan                       */}
       {/* ============================================================== */}
-      <div className="w-full lg:w-1/2 bg-[#ecebf3] dark:bg-slate-900/70 flex flex-col items-center justify-center p-6 sm:p-10 lg:p-14 border-b lg:border-b-0 lg:border-r border-slate-200/80 dark:border-slate-800 transition-colors">
-        <div className="w-full max-w-lg space-y-6 text-center">
+      <div className="w-full lg:w-1/2 bg-[#f4f3f9] dark:bg-slate-900/80 flex flex-col items-center justify-center p-6 sm:p-10 lg:p-14 xl:p-16 border-b lg:border-b-0 lg:border-r border-slate-200/70 dark:border-slate-800 transition-colors">
+        <div className="w-full max-w-xl xl:max-w-2xl space-y-6 sm:space-y-8 text-center">
           
-          {/* Banner Image Card with Soft Shadow */}
-          <div className="relative rounded-3xl overflow-hidden shadow-xl border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-800 aspect-[16/10] group">
-            <img
-              src={bannerImage}
-              alt={bannerTitle}
-              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-            />
-            {/* Subtle bottom gradient glow */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent pointer-events-none" />
+          {/* Banner Image Container - Ukuran Lebih Luas, Proporsional & Elegan */}
+          <div className="relative w-full max-w-[620px] xl:max-w-[680px] mx-auto rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-2xl shadow-slate-900/10 dark:shadow-black/50 border border-slate-200/80 dark:border-slate-700/60 bg-white dark:bg-slate-800 group">
+            <div className="w-full h-[280px] sm:h-[360px] lg:h-[390px] xl:h-[430px] overflow-hidden">
+              <img
+                src={bannerImage}
+                alt={bannerTitle}
+                className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              />
+            </div>
+            {/* Subtle elegant gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
           </div>
 
-          {/* Heading & Subtitle */}
-          <div className="space-y-2 pt-1">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+          {/* Heading & Subtitle Sambutan */}
+          <div className="space-y-2.5 pt-1 px-2">
+            <h1 className="text-2xl sm:text-3xl lg:text-[32px] font-bold text-slate-800 dark:text-slate-100 tracking-tight leading-snug">
               {bannerTitle}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium leading-relaxed max-w-md mx-auto text-center">
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 font-normal leading-relaxed max-w-lg mx-auto">
               {bannerSubtitle}
             </p>
           </div>
@@ -76,7 +78,7 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10 lg:p-14 min-h-[550px] lg:min-h-screen relative bg-white dark:bg-slate-950 transition-colors">
         
         {/* Dark Mode Toggle di Pojok Kanan Atas */}
-        <div className="absolute top-5 right-5 sm:top-6 sm:right-6">
+        <div className="absolute top-5 right-5 sm:top-7 sm:right-7">
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
             className="p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer flex items-center justify-center shadow-2xs"
@@ -88,34 +90,34 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
         </div>
 
         {/* Floating Login Card */}
-        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-7 sm:p-9 shadow-xl border border-slate-200/90 dark:border-slate-800 space-y-6">
+        <div className="w-full max-w-[430px] bg-white dark:bg-slate-900 rounded-[28px] sm:rounded-[32px] p-8 sm:p-10 shadow-2xl shadow-slate-200/70 dark:shadow-black/60 border border-slate-150 dark:border-slate-800 space-y-6">
           
           {/* Logo Badge & Title */}
-          <div className="text-center space-y-3">
+          <div className="text-center space-y-3.5">
             {companyLogo ? (
-              <div className="w-16 h-14 mx-auto rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center p-2 shadow-xs overflow-hidden">
+              <div className="w-20 h-16 sm:w-22 sm:h-18 mx-auto rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700 flex items-center justify-center p-2.5 shadow-xs overflow-hidden transition-transform hover:scale-105">
                 <img src={companyLogo} alt={companyName} className="w-full h-full object-contain" />
               </div>
             ) : (
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black font-mono text-xl shadow-md shadow-indigo-600/30">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-[#5235eb] text-white flex items-center justify-center font-bold font-mono text-2xl shadow-lg shadow-indigo-500/25">
                 {companyMonogram}
               </div>
             )}
 
             <div className="space-y-1">
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              <h2 className="text-2xl sm:text-[26px] font-bold text-slate-850 dark:text-white tracking-tight leading-tight">
                 {companyName}
               </h2>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-normal">
                 Silakan login untuk melanjutkan
               </p>
             </div>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 pt-1">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              <label className="block text-xs sm:text-[13px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                 Email
               </label>
               <input
@@ -124,12 +126,12 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder="Masukkan username atau email"
-                className="w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-600 transition shadow-2xs"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              <label className="block text-xs sm:text-[13px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                 Password
               </label>
               <div className="relative flex items-center">
@@ -139,7 +141,7 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-4 py-2.5 sm:py-3 pr-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition"
+                  className="w-full px-4 py-3 pr-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-600 transition shadow-2xs"
                 />
                 <button
                   type="button"
@@ -155,14 +157,14 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 py-3 px-4 rounded-xl sm:rounded-2xl bg-[#6347f8] hover:bg-[#5235eb] active:scale-[0.99] text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-500/25 transition cursor-pointer flex items-center justify-center gap-2"
+              className="w-full mt-3 py-3.5 px-4 rounded-xl sm:rounded-2xl bg-[#5235eb] hover:bg-[#4326d9] active:scale-[0.99] text-white font-semibold text-sm sm:text-base shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/35 transition cursor-pointer flex items-center justify-center gap-2"
             >
               {loading ? 'Memverifikasi...' : 'Login'}
             </button>
           </form>
 
           {/* Footer Copyright */}
-          <p className="text-center text-xs text-slate-400 dark:text-slate-500 pt-2 font-medium">
+          <p className="text-center text-xs text-slate-400 dark:text-slate-500 pt-2 font-normal">
             &copy; {new Date().getFullYear()} {companyName}
           </p>
 
