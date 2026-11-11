@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sun, Moon, Eye, EyeOff, MapPin } from 'lucide-react';
+import { Sun, Moon, Eye, EyeOff } from 'lucide-react';
 import { apiLogin } from '../../services/api';
 
 export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMode, showToast, appSettings }) {
@@ -62,9 +62,8 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
               {bannerTitle}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium leading-relaxed max-w-md mx-auto flex items-center justify-center gap-1.5">
-              <MapPin className="w-4 h-4 text-rose-500 shrink-0 inline" />
-              <span>{bannerSubtitle}</span>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium leading-relaxed max-w-md mx-auto text-center">
+              {bannerSubtitle}
             </p>
           </div>
 
