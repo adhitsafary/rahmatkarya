@@ -206,7 +206,7 @@ export default function FilamentNotificationDropdown({
         <div className="absolute right-0 mt-2 w-[92vw] sm:w-[440px] md:w-[480px] max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/90 dark:border-slate-800 z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden flex flex-col max-h-[82vh]">
           
           {/* Header */}
-          <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-800/30">
+          <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-800/30 shrink-0">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-2xs">
@@ -314,7 +314,7 @@ export default function FilamentNotificationDropdown({
           </div>
 
           {/* List Content Area */}
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 p-2 sm:p-3 space-y-2">
+          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 p-2 sm:p-3 space-y-2">
             {filteredItems.length === 0 ? (
               <div className="py-10 px-4 text-center">
                 <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
@@ -470,7 +470,7 @@ export default function FilamentNotificationDropdown({
           </div>
 
           {/* Footer Bar */}
-          <div className="p-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="p-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
             <span className="truncate">
               Total Tagihan Terbuka: <strong className="text-slate-800 dark:text-slate-200 font-mono">{data?.summary?.total_terms_amount_formatted || 'Rp 0'}</strong>
             </span>

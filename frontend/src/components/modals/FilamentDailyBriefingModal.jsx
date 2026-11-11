@@ -64,10 +64,10 @@ export default function FilamentDailyBriefingModal({
       />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10 flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10 flex flex-col max-h-[90vh] my-auto">
         
         {/* Header Hero Banner */}
-        <div className="relative p-4 sm:p-5 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white overflow-hidden">
+        <div className="relative p-4 sm:p-5 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white overflow-hidden shrink-0">
           {/* Subtle background glow */}
           <div className="absolute -right-12 -top-12 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -107,45 +107,72 @@ export default function FilamentDailyBriefingModal({
           </div>
 
           {/* Metric Highlights (3 Cards) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5 mt-2.5 sm:mt-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-2.5 mt-3 sm:mt-3.5">
             {/* Termin */}
-            <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15">
+            <div 
+              onClick={() => {
+                if (onSelectTab) {
+                  onSelectTab('projects');
+                  onClose();
+                }
+              }}
+              className="p-2.5 sm:p-3 rounded-2xl bg-white/10 hover:bg-white/15 backdrop-blur-md border border-white/15 transition cursor-pointer"
+              title="Klik untuk membuka Tagihan Termin"
+            >
               <div className="flex items-center justify-between text-white/70 text-[10px] font-bold uppercase tracking-wider mb-1">
-                <span>Tagihan Termin</span>
-                <Clock className="w-3.5 h-3.5 text-amber-300" />
+                <span className="truncate">Tagihan Termin</span>
+                <Clock className="w-3.5 h-3.5 shrink-0 text-amber-300 ml-1" />
               </div>
-              <div className="text-sm sm:text-base font-black text-white font-mono">
+              <div className="text-xs sm:text-base font-black text-white font-mono truncate" title={summary.total_terms_amount_formatted}>
                 {summary.total_terms_amount_formatted}
               </div>
-              <div className="text-[10px] text-white/60 mt-0.5">
+              <div className="text-[9px] sm:text-[10px] text-white/60 mt-0.5 truncate">
                 {summary.terms_count || 0} termin perlu penagihan
               </div>
             </div>
 
             {/* Piutang Klien */}
-            <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15">
+            <div 
+              onClick={() => {
+                if (onSelectTab) {
+                  onSelectTab('receivables');
+                  onClose();
+                }
+              }}
+              className="p-2.5 sm:p-3 rounded-2xl bg-white/10 hover:bg-white/15 backdrop-blur-md border border-white/15 transition cursor-pointer"
+              title="Klik untuk membuka Monitoring Piutang"
+            >
               <div className="flex items-center justify-between text-white/70 text-[10px] font-bold uppercase tracking-wider mb-1">
-                <span>Piutang Klien</span>
-                <Receipt className="w-3.5 h-3.5 text-rose-300" />
+                <span className="truncate">Piutang Klien</span>
+                <Receipt className="w-3.5 h-3.5 shrink-0 text-rose-300 ml-1" />
               </div>
-              <div className="text-sm sm:text-base font-black text-white font-mono">
+              <div className="text-xs sm:text-base font-black text-white font-mono truncate" title={summary.total_receivables_amount_formatted}>
                 {summary.total_receivables_amount_formatted}
               </div>
-              <div className="text-[10px] text-white/60 mt-0.5">
+              <div className="text-[9px] sm:text-[10px] text-white/60 mt-0.5 truncate">
                 {summary.receivables_count || 0} proyek sisa piutang
               </div>
             </div>
 
             {/* Honor Subkon */}
-            <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15">
+            <div 
+              onClick={() => {
+                if (onSelectTab) {
+                  onSelectTab('team');
+                  onClose();
+                }
+              }}
+              className="p-2.5 sm:p-3 rounded-2xl bg-white/10 hover:bg-white/15 backdrop-blur-md border border-white/15 transition cursor-pointer"
+              title="Klik untuk membuka Honor Tim Subkon"
+            >
               <div className="flex items-center justify-between text-white/70 text-[10px] font-bold uppercase tracking-wider mb-1">
-                <span>Honor Subkon</span>
-                <Users className="w-3.5 h-3.5 text-emerald-300" />
+                <span className="truncate">Honor Subkon</span>
+                <Users className="w-3.5 h-3.5 shrink-0 text-emerald-300 ml-1" />
               </div>
-              <div className="text-sm sm:text-base font-black text-white font-mono">
+              <div className="text-xs sm:text-base font-black text-white font-mono truncate" title={summary.total_subkon_amount_formatted}>
                 {summary.total_subkon_amount_formatted}
               </div>
-              <div className="text-[10px] text-white/60 mt-0.5">
+              <div className="text-[9px] sm:text-[10px] text-white/60 mt-0.5 truncate">
                 {summary.subkon_count || 0} rekan tim menanti
               </div>
             </div>
@@ -153,7 +180,7 @@ export default function FilamentDailyBriefingModal({
         </div>
 
         {/* Scrollable Action Items */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4">
           
           {/* Urgent / Priority Section */}
           <div>
@@ -312,7 +339,7 @@ export default function FilamentDailyBriefingModal({
         </div>
 
         {/* Footer Area */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="p-3.5 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 dark:text-slate-400 select-none">
             <input
               type="checkbox"
