@@ -24,15 +24,18 @@ function cleanAndCopyDir(src, dest) {
 }
 
 if (fs.existsSync(distDir)) {
-  const assetsDir = path.join(distDir, 'assets');
-  if (fs.existsSync(assetsDir)) {
-    cleanAndCopyDir(assetsDir, path.join(rootDir, 'assets'));
-    cleanAndCopyDir(assetsDir, path.join(panelDir, 'assets'));
+  for (const entry of fs.readdirSync(distDir, { withFileTypes: true })) {
+    const srcPath = path.join(distDir, entry.name);
+    const rootDest = path.join(rootDir, entry.name);
+    const panelDest = path.join(panelDir, entry.name);
+
+    if (entry.isDirectory()) {
+      cleanAndCopyDir(srcPath, rootDest);
+      cleanAndCopyDir(srcPath, panelDest);
+    } else {
+      fs.copyFileSync(srcPath, rootDest);
+      fs.copyFileSync(srcPath, panelDest);
+    }
   }
-  const indexHtml = path.join(distDir, 'index.html');
-  if (fs.existsSync(indexHtml)) {
-    fs.copyFileSync(indexHtml, path.join(rootDir, 'index.html'));
-    fs.copyFileSync(indexHtml, path.join(panelDir, 'index.html'));
-  }
-  console.log('Successfully cleaned and synced dist to root and panel!');
+  console.log('Successfully cleaned and synced all dist files to root and panel!');
 }

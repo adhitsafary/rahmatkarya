@@ -31,8 +31,9 @@ export default function FilamentSidebar({
   const isAdmin = currentUser?.role === 'ADMIN';
 
   const companyName = appSettings?.company_name || 'RAHMAT-KARYA';
-  const companyTagline = appSettings?.company_tagline || 'Management proyek';
-  const companyLogo = appSettings?.company_logo || '';
+  const companyTagline = appSettings?.company_tagline || 'Management Proyek & Digital Arus Kas';
+  const defaultLogo = './company-logo.png';
+  const companyLogo = appSettings?.company_logo || defaultLogo;
   const companyMonogram = getInitials(companyName) || 'RK';
 
   const navGroups = [
@@ -130,7 +131,16 @@ export default function FilamentSidebar({
               title="Perluas Sidebar"
             >
               {companyLogo ? (
-                <img src={companyLogo} alt={companyName} className="w-full h-full object-contain" />
+                <img
+                  src={companyLogo}
+                  alt={companyName}
+                  onError={(e) => {
+                    if (!e.currentTarget.src.includes('company-logo.png')) {
+                      e.currentTarget.src = './company-logo.png';
+                    }
+                  }}
+                  className="w-full h-full object-contain"
+                />
               ) : (
                 companyMonogram
               )}
@@ -144,7 +154,16 @@ export default function FilamentSidebar({
             >
               {companyLogo ? (
                 <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-xs overflow-hidden p-0.5">
-                  <img src={companyLogo} alt={companyName} className="w-full h-full object-contain" />
+                  <img
+                    src={companyLogo}
+                    alt={companyName}
+                    onError={(e) => {
+                      if (!e.currentTarget.src.includes('company-logo.png')) {
+                        e.currentTarget.src = './company-logo.png';
+                      }
+                    }}
+                    className="w-full h-full object-contain"
+                  />
                 </div>
               ) : (
                 <div className="w-8 h-8 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs">

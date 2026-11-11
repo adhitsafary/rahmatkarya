@@ -9,7 +9,8 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
   const [loading, setLoading] = useState(false);
 
   const companyName = appSettings?.company_name || 'Rahmat-Karya';
-  const companyLogo = appSettings?.company_logo || '';
+  const defaultLogo = './company-logo.png';
+  const companyLogo = appSettings?.company_logo || defaultLogo;
   const companyMonogram = companyName
     .replace(/^PT\s+/i, '')
     .split(/[\s-]+/)
@@ -19,10 +20,10 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
     .toUpperCase()
     .slice(0, 2) || 'RK';
 
-  const defaultBanner = 'https://images.unsplash.com/photo-1541888946425-d0fbb186c5f7?auto=format&fit=crop&w=1200&q=80';
+  const defaultBanner = './login-banner.jpg';
   const bannerImage = appSettings?.login_banner_image || defaultBanner;
   const bannerTitle = appSettings?.login_banner_title || `Selamat Datang di ${companyName}`;
-  const bannerSubtitle = appSettings?.login_banner_subtitle || 'Mengintegrasikan Keamanan dan Efisiensi dalam Setiap Proyek Infrastruktur & Finansial.';
+  const bannerSubtitle = appSettings?.login_banner_subtitle || 'Mengintegrasikan Keamanan dan Efisiensi dalam Setiap Proyek Arsitektur, Infrastruktur & Finansial.';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,6 +53,11 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
               <img
                 src={bannerImage}
                 alt={bannerTitle}
+                onError={(e) => {
+                  if (!e.currentTarget.src.includes('login-banner.jpg')) {
+                    e.currentTarget.src = './login-banner.jpg';
+                  }
+                }}
                 className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
               />
             </div>
@@ -95,8 +101,17 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
           {/* Logo Badge & Title */}
           <div className="text-center space-y-3.5">
             {companyLogo ? (
-              <div className="w-20 h-16 sm:w-22 sm:h-18 mx-auto rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700 flex items-center justify-center p-2.5 shadow-xs overflow-hidden transition-transform hover:scale-105">
-                <img src={companyLogo} alt={companyName} className="w-full h-full object-contain" />
+              <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700 flex items-center justify-center p-2 shadow-sm overflow-hidden transition-transform hover:scale-105">
+                <img
+                  src={companyLogo}
+                  alt={companyName}
+                  onError={(e) => {
+                    if (!e.currentTarget.src.includes('company-logo.png')) {
+                      e.currentTarget.src = './company-logo.png';
+                    }
+                  }}
+                  className="w-full h-full object-contain rounded-xl"
+                />
               </div>
             ) : (
               <div className="w-16 h-16 mx-auto rounded-2xl bg-[#5235eb] text-white flex items-center justify-center font-bold font-mono text-2xl shadow-lg shadow-indigo-500/25">
