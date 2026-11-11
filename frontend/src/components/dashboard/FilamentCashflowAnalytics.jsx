@@ -8,6 +8,7 @@ import {
   ArrowUpRight, 
   CreditCard, 
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   ChevronUp,
   Zap,
@@ -20,9 +21,39 @@ import {
   X,
   PhoneCall,
   ExternalLink,
-  Layers
+  Layers,
+  Table as TableIcon,
+  FolderKanban
 } from 'lucide-react';
 import { formatRupiah, getInitials } from '../../utils/format';
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const FULL_MONTH_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+function parseProjectYearMonth(p) {
+  if (!p) return null;
+  const dateStr = p.contract_date || p.start_date || p.deadline_date || p.created_at;
+  if (!dateStr) return null;
+  const match = String(dateStr).match(/^(\d{4})-(\d{2})/);
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    if (!isNaN(year) && !isNaN(month) && month >= 0 && month <= 11) {
+      return { year, month };
+    }
+  }
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    return {
+      year: d.getFullYear(),
+      month: d.getMonth()
+    };
+  }
+  return null;
+}
 
 // Clean WhatsApp Icon
 const WhatsAppIcon = ({ className = "w-3.5 h-3.5" }) => (
@@ -75,7 +106,6 @@ export default function FilamentCashflowAnalytics({
   selectedWorkflowStage = null,
   onSelectWorkflowStage
 }) {
-  const [hoveredProject, setHoveredProject] = useState(null);
   const [hoveredSlice, setHoveredSlice] = useState(null);
   const [internalSelectedStage, setInternalSelectedStage] = useState(null);
 
@@ -102,9 +132,25 @@ export default function FilamentCashflowAnalytics({
     return projects.filter(p => getNormalizedStage(p) === activeSelectedStage);
   }, [projects, activeSelectedStage]);
 
-  // Sorting and limit state for cashflow comparison chart (Default: 3 data teratas)
-  const [chartSort, setChartSort] = useState('highest_spk'); // 'highest_spk' | 'lowest_spk' | 'highest_rec' | 'newest'
-  const [showAllChart, setShowAllChart] = useState(false);
+  // Available Years detected from projects
+  const availableYears = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const yearSet = new Set([currentYear]);
+    projects.forEach(p => {
+      const ym = parseProjectYearMonth(p);
+      if (ym && ym.year >= 2000 && ym.year <= 2100) {
+        yearSet.add(ym.year);
+      }
+    });
+    return Array.from(yearSet).sort((a, b) => b - a);
+  }, [projects]);
+
+  // Kalkulasi Proyek Per Bulan (Pertahun Tampilkannya) States
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+  const [chartViewMode, setChartViewMode] = useState('chart'); // 'chart' | 'table'
+  const [chartMetricFilter, setChartMetricFilter] = useState('all'); // 'all' | 'spk_paid' | 'paid_subkon' | 'receivables'
+  const [activeMonthIndex, setActiveMonthIndex] = useState(null);
+  const [hoveredMonthIndex, setHoveredMonthIndex] = useState(null);
 
   // Filter Radar Category: 'all' | 'receivables' | 'revisions' | 'deadlines' | 'subkons'
   const [radarFilter, setRadarFilter] = useState('all');
@@ -246,35 +292,82 @@ export default function FilamentCashflowAnalytics({
     };
   }, [projects, summary]);
 
-  // Visual Chart calculations: default 3 data teratas (Terbesar -> Terkecil)
-  const chartProjects = useMemo(() => {
-    let list = [...projects];
-    if (chartSort === 'highest_spk') {
-      list.sort((a, b) => (parseFloat(b.total_contract_value) || 0) - (parseFloat(a.total_contract_value) || 0));
-    } else if (chartSort === 'lowest_spk') {
-      list.sort((a, b) => (parseFloat(a.total_contract_value) || 0) - (parseFloat(b.total_contract_value) || 0));
-    } else if (chartSort === 'highest_rec') {
-      list.sort((a, b) => (parseFloat(b.client_receivable_remaining) || 0) - (parseFloat(a.client_receivable_remaining) || 0));
-    } else if (chartSort === 'newest') {
-      list.sort((a, b) => (b.project_id || b.id || 0) - (a.project_id || a.id || 0));
-    }
-    return showAllChart ? list : list.slice(0, 3);
-  }, [projects, chartSort, showAllChart]);
+  // Kalkulasi Proyek Per Bulan (12 Bulan untuk Tahun Terpilih)
+  const monthlyData = useMemo(() => {
+    const list = activeSelectedStage 
+      ? projects.filter(p => getNormalizedStage(p) === activeSelectedStage)
+      : projects;
 
-  const maxVal = useMemo(() => {
-    let max = 1000000;
-    chartProjects.forEach(p => {
-      const c = parseFloat(p.total_contract_value) || 0;
-      const pd = parseFloat(p.total_paid_by_client) || 0;
-      const rc = parseFloat(p.client_receivable_remaining) || 0;
-      const tm = parseFloat(p.total_agreed_team_honor) || 0;
-      if (c > max) max = c;
-      if (pd > max) max = pd;
-      if (rc > max) max = rc;
-      if (tm > max) max = tm;
+    const months = Array.from({ length: 12 }, (_, i) => ({
+      monthIndex: i,
+      monthShort: MONTH_NAMES[i],
+      monthLong: FULL_MONTH_NAMES[i],
+      projectCount: 0,
+      totalSPK: 0,
+      totalPaid: 0,
+      totalReceivable: 0,
+      totalSubkon: 0,
+      totalProfit: 0,
+      projects: []
+    }));
+
+    list.forEach(p => {
+      const ym = parseProjectYearMonth(p);
+      if (ym && ym.year === selectedYear && ym.month >= 0 && ym.month < 12) {
+        const m = months[ym.month];
+        m.projectCount += 1;
+        m.totalSPK += parseFloat(p.total_contract_value) || 0;
+        m.totalPaid += parseFloat(p.total_paid_by_client) || 0;
+        m.totalReceivable += parseFloat(p.client_receivable_remaining) || 0;
+        m.totalSubkon += parseFloat(p.total_agreed_team_honor) || 0;
+        m.totalProfit += (parseFloat(p.total_contract_value) || 0) - (parseFloat(p.total_agreed_team_honor) || 0);
+        m.projects.push(p);
+      }
     });
-    return max * 1.05; // 5% breathing room
-  }, [chartProjects]);
+
+    return months;
+  }, [projects, selectedYear, activeSelectedStage]);
+
+  // Akumulasi total tahunan untuk selectedYear
+  const yearlyTotals = useMemo(() => {
+    return monthlyData.reduce((acc, m) => ({
+      projectCount: acc.projectCount + m.projectCount,
+      totalSPK: acc.totalSPK + m.totalSPK,
+      totalPaid: acc.totalPaid + m.totalPaid,
+      totalReceivable: acc.totalReceivable + m.totalReceivable,
+      totalSubkon: acc.totalSubkon + m.totalSubkon,
+      totalProfit: acc.totalProfit + m.totalProfit
+    }), {
+      projectCount: 0,
+      totalSPK: 0,
+      totalPaid: 0,
+      totalReceivable: 0,
+      totalSubkon: 0,
+      totalProfit: 0
+    });
+  }, [monthlyData]);
+
+  // Skala visual tertinggi untuk batang diagram
+  const maxMonthlyValue = useMemo(() => {
+    let max = 0;
+    monthlyData.forEach(m => {
+      if (chartMetricFilter === 'all') {
+        max = Math.max(max, m.totalSPK, m.totalPaid, m.totalReceivable, m.totalSubkon);
+      } else if (chartMetricFilter === 'spk_paid') {
+        max = Math.max(max, m.totalSPK, m.totalPaid);
+      } else if (chartMetricFilter === 'paid_subkon') {
+        max = Math.max(max, m.totalPaid, m.totalSubkon);
+      } else if (chartMetricFilter === 'receivables') {
+        max = Math.max(max, m.totalReceivable);
+      }
+    });
+    return max > 0 ? max * 1.15 : 10000000;
+  }, [monthlyData, chartMetricFilter]);
+
+  // Bulan yang sedang diinspeksi (hovered atau diklik)
+  const inspectedMonth = hoveredMonthIndex !== null 
+    ? monthlyData[hoveredMonthIndex] 
+    : (activeMonthIndex !== null ? monthlyData[activeMonthIndex] : null);
 
   // Donut chart path calculations
   const donutData = useMemo(() => {
@@ -406,196 +499,501 @@ export default function FilamentCashflowAnalytics({
       {/* ================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         
-        {/* Left Chart (2 Cols): Interactive Cashflow Comparison Bars */}
+        {/* Left Chart (2 Cols): Kalkulasi Proyek Per Bulan (Pertahun Tampilkannya) */}
         <div className="lg:col-span-2 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-2xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800 pb-3">
+          
+          {/* Header & Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
             <div>
               <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight">
-                  KOMPARASI ARUS KAS PER PROYEK
-                </h3>
+                <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-900/40">
+                  <BarChart3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                    KALKULASI PROYEK PER BULAN
+                    <span className="text-xs font-black font-mono px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                      {selectedYear}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Kalkulasi nilai SPK, termin masuk, sisa piutang, dan honor subkon per bulan (Tahun {selectedYear})
+                  </p>
+                </div>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Visualisasi realisasi Termin Masuk vs Sisa Piutang vs Honor Subkon (Urutan: Terbesar &rarr; Terkecil)
-              </p>
             </div>
 
-            {/* Controls: Sort Dropdown, Tombol Lihat Semua & Legend */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Dropdown Sort */}
-              <div className="flex items-center gap-1.5">
-                <select
-                  value={chartSort}
-                  onChange={(e) => setChartSort(e.target.value)}
-                  className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-[11px] font-bold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
-                  title="Urutan Proyek"
+            {/* Controls: Year Selector, Metric Filter & View Mode */}
+            <div className="flex flex-wrap items-center gap-2">
+              
+              {/* Year Navigation */}
+              <div className="flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setSelectedYear(prev => prev - 1)}
+                  className="p-1 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                  title="Tahun Sebelumnya"
                 >
-                  <option value="highest_spk">Total SPK (Terbesar - Terkecil)</option>
-                  <option value="lowest_spk">Total SPK (Terkecil - Terbesar)</option>
-                  <option value="highest_rec">Sisa Piutang Terbesar</option>
-                  <option value="newest">Proyek Terbaru</option>
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => {
+                    setSelectedYear(Number(e.target.value));
+                    setActiveMonthIndex(null);
+                  }}
+                  className="bg-transparent border-0 text-[11px] font-black font-mono text-slate-800 dark:text-slate-100 px-1.5 py-0.5 focus:outline-none cursor-pointer"
+                  title="Pilih Tahun"
+                >
+                  {availableYears.map(yr => (
+                    <option key={yr} value={yr} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                      Tahun {yr}
+                    </option>
+                  ))}
                 </select>
-
-                {projects.length > 3 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAllChart(!showAllChart)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                    title={showAllChart ? "Tampilkan 3 Proyek Saja" : "Tampilkan Seluruh Proyek"}
-                  >
-                    <Eye className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{showAllChart ? 'Ringkas (3)' : `Lihat Semua (${projects.length})`}</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedYear(prev => prev + 1)}
+                  className="p-1 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                  title="Tahun Berikutnya"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               </div>
 
-              {/* Legend */}
-              <div className="flex items-center gap-2.5 text-[10px] font-bold font-mono pl-2 border-l border-slate-200 dark:border-slate-700">
-                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>
-                  Termin Masuk
-                </span>
-                <span className="flex items-center gap-1 text-rose-500 dark:text-rose-400">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-rose-500"></span>
-                  Sisa Piutang
-                </span>
-                <span className="flex items-center gap-1 text-amber-500 dark:text-amber-400">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-amber-400"></span>
-                  Honor Tim
-                </span>
+              {/* Metric Filter */}
+              <select
+                value={chartMetricFilter}
+                onChange={(e) => setChartMetricFilter(e.target.value)}
+                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer shadow-2xs"
+                title="Filter Metrik"
+              >
+                <option value="all">Semua Metrik</option>
+                <option value="spk_paid">SPK & Realisasi Masuk</option>
+                <option value="paid_subkon">Kas Masuk vs Subkon</option>
+                <option value="receivables">Sisa Piutang Saja</option>
+              </select>
+
+              {/* Toggle Chart / Table */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setChartViewMode('chart')}
+                  className={`p-1 sm:px-2 sm:py-1 rounded-md text-[11px] font-bold transition flex items-center gap-1 cursor-pointer ${
+                    chartViewMode === 'chart'
+                      ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-2xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title="Tampilan Grafik Batang"
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Grafik</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartViewMode('table')}
+                  className={`p-1 sm:px-2 sm:py-1 rounded-md text-[11px] font-bold transition flex items-center gap-1 cursor-pointer ${
+                    chartViewMode === 'table'
+                      ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-2xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title="Tampilan Tabel Rekapitulasi"
+                >
+                  <TableIcon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Tabel</span>
+                </button>
               </div>
+
             </div>
           </div>
 
-          {/* SVG Visual Bars Canvas */}
-          <div className="relative pt-2">
-            {chartProjects.length === 0 ? (
-              <div className="h-48 flex items-center justify-center text-xs text-slate-400">
-                Belum ada proyek yang dapat ditampilkan
+          {/* Annual Summary Stats Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-[11px]">
+            <div className="col-span-1">
+              <span className="text-[10px] text-slate-400 block font-mono">Total Nilai SPK</span>
+              <span className="font-extrabold text-blue-600 dark:text-blue-400 font-mono text-xs">
+                {formatRupiah(yearlyTotals.totalSPK)}
+              </span>
+            </div>
+            <div className="col-span-1">
+              <span className="text-[10px] text-slate-400 block font-mono">Termin Masuk</span>
+              <span className="font-extrabold text-emerald-600 dark:text-emerald-400 font-mono text-xs">
+                {formatRupiah(yearlyTotals.totalPaid)}
+              </span>
+            </div>
+            <div className="col-span-1">
+              <span className="text-[10px] text-slate-400 block font-mono">Sisa Piutang</span>
+              <span className="font-extrabold text-rose-500 dark:text-rose-400 font-mono text-xs">
+                {formatRupiah(yearlyTotals.totalReceivable)}
+              </span>
+            </div>
+            <div className="col-span-1">
+              <span className="text-[10px] text-slate-400 block font-mono">Honor Tim Subkon</span>
+              <span className="font-extrabold text-amber-500 dark:text-amber-400 font-mono text-xs">
+                {formatRupiah(yearlyTotals.totalSubkon)}
+              </span>
+            </div>
+            <div className="col-span-2 sm:col-span-1 flex items-center justify-between sm:justify-end gap-1.5 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-200 dark:border-slate-700">
+              <span className="text-[10px] text-slate-400 sm:hidden font-mono">Akumulasi:</span>
+              <span className="px-2 py-1 rounded-lg bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 font-bold font-mono text-[10px]">
+                {yearlyTotals.projectCount} Proyek ({selectedYear})
+              </span>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[10px] font-bold font-mono">
+            <div className="flex items-center gap-3">
+              {(chartMetricFilter === 'all' || chartMetricFilter === 'spk_paid') && (
+                <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                  <span className="w-2.5 h-2.5 rounded-xs bg-blue-500"></span>
+                  Total SPK
+                </span>
+              )}
+              {(chartMetricFilter === 'all' || chartMetricFilter === 'spk_paid' || chartMetricFilter === 'paid_subkon') && (
+                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                  <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500"></span>
+                  Termin Masuk
+                </span>
+              )}
+              {(chartMetricFilter === 'all' || chartMetricFilter === 'receivables') && (
+                <span className="flex items-center gap-1.5 text-rose-500 dark:text-rose-400">
+                  <span className="w-2.5 h-2.5 rounded-xs bg-rose-500"></span>
+                  Sisa Piutang
+                </span>
+              )}
+              {(chartMetricFilter === 'all' || chartMetricFilter === 'paid_subkon') && (
+                <span className="flex items-center gap-1.5 text-amber-500 dark:text-amber-400">
+                  <span className="w-2.5 h-2.5 rounded-xs bg-amber-400"></span>
+                  Honor Tim
+                </span>
+              )}
+            </div>
+            <div className="text-[10px] text-slate-400 font-normal">
+              💡 Klik kolom bulan untuk rincian proyek
+            </div>
+          </div>
+
+          {/* VIEW MODE 1: CHART */}
+          {chartViewMode === 'chart' && (
+            <div className="space-y-3">
+              {/* Monthly Visual Column Chart (12 Columns) */}
+              <div className="relative pt-4 pb-2 px-1 rounded-xl bg-slate-50/40 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                
+                {/* Horizontal reference lines */}
+                <div className="absolute inset-x-2 top-6 bottom-10 flex flex-col justify-between pointer-events-none opacity-20 dark:opacity-10">
+                  <div className="border-b border-dashed border-slate-400"></div>
+                  <div className="border-b border-dashed border-slate-400"></div>
+                  <div className="border-b border-slate-400"></div>
+                </div>
+
+                {/* 12 Months Grid */}
+                <div className="grid grid-cols-12 gap-1 sm:gap-2 h-52 sm:h-56 items-end relative z-10">
+                  {monthlyData.map((m) => {
+                    const isSelected = activeMonthIndex === m.monthIndex;
+                    const isHovered = hoveredMonthIndex === m.monthIndex;
+                    const hasData = m.projectCount > 0;
+
+                    const spkH = maxMonthlyValue > 0 ? (m.totalSPK / maxMonthlyValue) * 100 : 0;
+                    const paidH = maxMonthlyValue > 0 ? (m.totalPaid / maxMonthlyValue) * 100 : 0;
+                    const recH = maxMonthlyValue > 0 ? (m.totalReceivable / maxMonthlyValue) * 100 : 0;
+                    const subkonH = maxMonthlyValue > 0 ? (m.totalSubkon / maxMonthlyValue) * 100 : 0;
+
+                    return (
+                      <div
+                        key={m.monthIndex}
+                        onMouseEnter={() => setHoveredMonthIndex(m.monthIndex)}
+                        onMouseLeave={() => setHoveredMonthIndex(null)}
+                        onClick={() => {
+                          if (hasData) {
+                            setActiveMonthIndex(isSelected ? null : m.monthIndex);
+                          }
+                        }}
+                        className={`flex flex-col items-center h-full justify-end p-1 rounded-xl transition cursor-pointer select-none ${
+                          isSelected 
+                            ? 'bg-blue-100/60 dark:bg-blue-950/70 ring-1 ring-blue-500' 
+                            : (isHovered ? 'bg-slate-100/70 dark:bg-slate-800/60' : 'hover:bg-slate-100/40 dark:hover:bg-slate-800/30')
+                        }`}
+                        title={`${m.monthLong} ${selectedYear}: ${m.projectCount} Proyek`}
+                      >
+                        {/* Top Badge: Project Count */}
+                        <div className="mb-1.5 text-center">
+                          {hasData ? (
+                            <span className={`inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full text-[9px] sm:text-[10px] font-black font-mono shadow-2xs ${
+                              isSelected
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200'
+                            }`}>
+                              {m.projectCount}
+                            </span>
+                          ) : (
+                            <span className="text-[9px] text-slate-300 dark:text-slate-700 font-mono">0</span>
+                          )}
+                        </div>
+
+                        {/* Bars Container */}
+                        <div className="w-full flex-1 flex items-end justify-center gap-0.5 sm:gap-1 max-h-36">
+                          {(chartMetricFilter === 'all' || chartMetricFilter === 'spk_paid') && (
+                            <div
+                              className="w-1 sm:w-1.5 rounded-t-xs bg-blue-500 dark:bg-blue-400 transition-all duration-300"
+                              style={{ 
+                                height: `${m.totalSPK > 0 ? Math.max(spkH, 4) : 0}%`,
+                                opacity: m.totalSPK > 0 ? 1 : 0.2
+                              }}
+                              title={`Total SPK: ${formatRupiah(m.totalSPK)}`}
+                            />
+                          )}
+
+                          {(chartMetricFilter === 'all' || chartMetricFilter === 'spk_paid' || chartMetricFilter === 'paid_subkon') && (
+                            <div
+                              className="w-1 sm:w-1.5 rounded-t-xs bg-emerald-500 dark:bg-emerald-400 transition-all duration-300"
+                              style={{ 
+                                height: `${m.totalPaid > 0 ? Math.max(paidH, 4) : 0}%`,
+                                opacity: m.totalPaid > 0 ? 1 : 0.2
+                              }}
+                              title={`Termin Masuk: ${formatRupiah(m.totalPaid)}`}
+                            />
+                          )}
+
+                          {(chartMetricFilter === 'all' || chartMetricFilter === 'receivables') && (
+                            <div
+                              className="w-1 sm:w-1.5 rounded-t-xs bg-rose-500 dark:bg-rose-400 transition-all duration-300"
+                              style={{ 
+                                height: `${m.totalReceivable > 0 ? Math.max(recH, 4) : 0}%`,
+                                opacity: m.totalReceivable > 0 ? 1 : 0.2
+                              }}
+                              title={`Sisa Piutang: ${formatRupiah(m.totalReceivable)}`}
+                            />
+                          )}
+
+                          {(chartMetricFilter === 'all' || chartMetricFilter === 'paid_subkon') && (
+                            <div
+                              className="w-1 sm:w-1.5 rounded-t-xs bg-amber-400 dark:bg-amber-300 transition-all duration-300"
+                              style={{ 
+                                height: `${m.totalSubkon > 0 ? Math.max(subkonH, 4) : 0}%`,
+                                opacity: m.totalSubkon > 0 ? 1 : 0.2
+                              }}
+                              title={`Honor Subkon: ${formatRupiah(m.totalSubkon)}`}
+                            />
+                          )}
+                        </div>
+
+                        {/* Month Label */}
+                        <div className="mt-2 text-center">
+                          <span className={`text-[10px] sm:text-[11px] font-mono tracking-tight block ${
+                            isSelected ? 'font-black text-slate-900 dark:text-white' : 'font-semibold text-slate-500 dark:text-slate-400'
+                          }`}>
+                            {m.monthShort}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            ) : (
-              <div className="space-y-3.5">
-                {chartProjects.map((p, idx) => {
+
+              {/* Inspected Month Live Strip (on Hover / Click) */}
+              {inspectedMonth && (
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs animate-fadeIn">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-slate-900 dark:text-white font-mono">
+                      📅 {inspectedMonth.monthLong} {selectedYear}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                      {inspectedMonth.projectCount} Proyek
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 font-mono text-[11px]">
+                    <span className="text-blue-600 dark:text-blue-400">
+                      SPK: <strong className="font-extrabold">{formatRupiah(inspectedMonth.totalSPK)}</strong>
+                    </span>
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      Masuk: <strong className="font-extrabold">{formatRupiah(inspectedMonth.totalPaid)}</strong>
+                    </span>
+                    <span className="text-rose-500 dark:text-rose-400">
+                      Piutang: <strong className="font-extrabold">{formatRupiah(inspectedMonth.totalReceivable)}</strong>
+                    </span>
+                    <span className="text-amber-500 dark:text-amber-400">
+                      Subkon: <strong className="font-extrabold">{formatRupiah(inspectedMonth.totalSubkon)}</strong>
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* VIEW MODE 2: TABLE */}
+          {chartViewMode === 'table' && (
+            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700 font-mono text-[11px]">
+                  <tr>
+                    <th className="py-2.5 px-3">Bulan</th>
+                    <th className="py-2.5 px-2 text-center">Proyek</th>
+                    <th className="py-2.5 px-3 text-right">Total SPK</th>
+                    <th className="py-2.5 px-3 text-right">Termin Masuk</th>
+                    <th className="py-2.5 px-3 text-right">Sisa Piutang</th>
+                    <th className="py-2.5 px-3 text-right">Honor Subkon</th>
+                    <th className="py-2.5 px-3 text-right">Estimasi Margin</th>
+                    <th className="py-2.5 px-2 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[11px]">
+                  {monthlyData.map((m) => {
+                    const hasData = m.projectCount > 0;
+                    const isSelected = activeMonthIndex === m.monthIndex;
+
+                    return (
+                      <tr 
+                        key={m.monthIndex}
+                        className={`transition ${
+                          isSelected 
+                            ? 'bg-blue-50/70 dark:bg-blue-950/40 font-bold' 
+                            : (hasData ? 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40' : 'opacity-40')
+                        }`}
+                      >
+                        <td className="py-2 px-3 font-semibold text-slate-800 dark:text-slate-200">
+                          {m.monthLong}
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          {hasData ? (
+                            <span className="px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold text-[10px]">
+                              {m.projectCount}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">0</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right font-bold text-blue-600 dark:text-blue-400">
+                          {formatRupiah(m.totalSPK)}
+                        </td>
+                        <td className="py-2 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatRupiah(m.totalPaid)}
+                        </td>
+                        <td className="py-2 px-3 text-right font-bold text-rose-500 dark:text-rose-400">
+                          {formatRupiah(m.totalReceivable)}
+                        </td>
+                        <td className="py-2 px-3 text-right font-bold text-amber-500 dark:text-amber-400">
+                          {formatRupiah(m.totalSubkon)}
+                        </td>
+                        <td className="py-2 px-3 text-right font-bold text-slate-700 dark:text-slate-300">
+                          {formatRupiah(m.totalProfit)}
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          {hasData ? (
+                            <button
+                              type="button"
+                              onClick={() => setActiveMonthIndex(isSelected ? null : m.monthIndex)}
+                              className="px-2 py-0.5 rounded text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 border border-blue-200 dark:border-blue-800 transition cursor-pointer"
+                            >
+                              {isSelected ? 'Tutup' : 'Rincian'}
+                            </button>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-700">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-slate-100 dark:bg-slate-800 font-mono font-bold text-[11px] border-t-2 border-slate-300 dark:border-slate-700">
+                  <tr>
+                    <td className="py-2.5 px-3 text-slate-900 dark:text-white">TOTAL {selectedYear}</td>
+                    <td className="py-2.5 px-2 text-center text-blue-600 dark:text-blue-400">{yearlyTotals.projectCount}</td>
+                    <td className="py-2.5 px-3 text-right text-blue-600 dark:text-blue-400">{formatRupiah(yearlyTotals.totalSPK)}</td>
+                    <td className="py-2.5 px-3 text-right text-emerald-600 dark:text-emerald-400">{formatRupiah(yearlyTotals.totalPaid)}</td>
+                    <td className="py-2.5 px-3 text-right text-rose-500 dark:text-rose-400">{formatRupiah(yearlyTotals.totalReceivable)}</td>
+                    <td className="py-2.5 px-3 text-right text-amber-500 dark:text-amber-400">{formatRupiah(yearlyTotals.totalSubkon)}</td>
+                    <td className="py-2.5 px-3 text-right text-slate-900 dark:text-white">{formatRupiah(yearlyTotals.totalProfit)}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+
+          {/* ACTIVE MONTH PROJECT DRILLDOWN DRAWER */}
+          {activeMonthIndex !== null && monthlyData[activeMonthIndex]?.projects.length > 0 && (
+            <div className="rounded-xl border border-blue-200/90 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 p-3 sm:p-4 space-y-3 animate-fadeIn">
+              <div className="flex items-center justify-between border-b border-blue-200/60 dark:border-blue-900/40 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <FolderKanban className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white">
+                    Rincian Proyek Bulan {monthlyData[activeMonthIndex].monthLong} {selectedYear}
+                  </span>
+                  <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-blue-600 text-white">
+                    {monthlyData[activeMonthIndex].projects.length} Proyek
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveMonthIndex(null)}
+                  className="p-1 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 text-slate-500 dark:text-slate-400 transition cursor-pointer"
+                  title="Tutup Rincian"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Projects List */}
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {monthlyData[activeMonthIndex].projects.map((p, idx) => {
                   const contract = parseFloat(p.total_contract_value) || 0;
                   const paid = parseFloat(p.total_paid_by_client) || 0;
                   const rec = parseFloat(p.client_receivable_remaining) || 0;
-                  const teamTotal = parseFloat(p.total_agreed_team_honor) || 0;
-
-                  const paidW = maxVal > 0 ? Math.max(0, Math.min(100, (paid / maxVal) * 100)) : 0;
-                  const recW = maxVal > 0 ? Math.max(0, Math.min(100, (Math.max(0, rec) / maxVal) * 100)) : 0;
-                  const teamW = maxVal > 0 ? Math.max(0, Math.min(100, (teamTotal / maxVal) * 100)) : 0;
-
-                  const isHovered = hoveredProject === p.project_id;
-                  const rankBadge = getRankBadge(idx);
+                  const subkon = parseFloat(p.total_agreed_team_honor) || 0;
 
                   return (
-                    <div 
+                    <div
                       key={p.project_id || p.id || idx}
-                      onMouseEnter={() => setHoveredProject(p.project_id)}
-                      onMouseLeave={() => setHoveredProject(null)}
-                      onClick={() => onOpenDetail(p)}
-                      className={`p-2.5 rounded-xl transition cursor-pointer ${
-                        isHovered 
-                          ? 'bg-slate-50 dark:bg-slate-800/80 shadow-2xs' 
-                          : 'hover:bg-slate-50/60 dark:hover:bg-slate-800/40'
-                      }`}
+                      onClick={() => onOpenDetail && onOpenDetail(p)}
+                      className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 transition cursor-pointer shadow-2xs hover:shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                     >
-                      {/* Bar Top Label */}
-                      <div className="flex items-center justify-between text-xs mb-1.5">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {chartSort === 'highest_spk' ? (
-                            <span className={`w-5 h-5 rounded-md text-[9px] font-black font-mono flex items-center justify-center shrink-0 ${rankBadge.class}`}>
-                              {rankBadge.label}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px] font-black font-mono flex items-center justify-center shrink-0 border border-blue-200/50 dark:border-blue-800/50">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
+                              {p.project_name}
                             </span>
-                          ) : (
-                            <span className="w-5 h-5 rounded-md bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-[9px] font-black font-mono flex items-center justify-center shrink-0">
-                              {getInitials(p.project_name) || `P${idx+1}`}
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                              {p.workflow_step || 'PENGERJAAN'}
                             </span>
-                          )}
-                          <span className="font-bold text-slate-900 dark:text-white truncate">
-                            {p.project_name}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono truncate hidden sm:inline">
-                            ({p.client_name})
-                          </span>
-                        </div>
-                        <div className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 shrink-0">
-                          Total SPK: <span className="text-slate-900 dark:text-white">{formatRupiah(contract)}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono truncate">
+                            Klien: {p.client_name || '-'} • Kode: {p.project_code || `PRJ-${p.project_id}`}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Triple Micro-Bars for comparison */}
-                      <div className="space-y-1">
-                        
-                        {/* 1. Kas Masuk (Emerald) */}
-                        <div className="flex items-center gap-2">
-                          <span className="w-16 text-[10px] font-mono text-slate-400 text-right">Masuk</span>
-                          <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
-                              style={{ width: `${paidW}%` }}
-                            />
-                          </div>
-                          <span className="w-24 text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right">
-                            {formatRupiah(paid)}
-                          </span>
+                      <div className="flex items-center gap-3 sm:gap-4 font-mono text-[10px] sm:text-[11px] shrink-0 self-end sm:self-auto border-t sm:border-t-0 pt-1 sm:pt-0 border-slate-100 dark:border-slate-800">
+                        <div className="text-right">
+                          <span className="text-[9px] text-slate-400 block">SPK</span>
+                          <span className="font-bold text-slate-900 dark:text-white">{formatRupiah(contract)}</span>
                         </div>
-
-                        {/* 2. Sisa Piutang (Rose) */}
-                        <div className="flex items-center gap-2">
-                          <span className="w-16 text-[10px] font-mono text-slate-400 text-right">Piutang</span>
-                          <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-rose-500 rounded-full transition-all duration-500" 
-                              style={{ width: `${recW}%` }}
-                            />
-                          </div>
-                          <span className="w-24 text-[10px] font-mono font-bold text-rose-500 dark:text-rose-400 text-right">
-                            {formatRupiah(rec)}
-                          </span>
+                        <div className="text-right">
+                          <span className="text-[9px] text-emerald-600 dark:text-emerald-400 block">Masuk</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatRupiah(paid)}</span>
                         </div>
-
-                        {/* 3. Plafon Subkon (Amber) */}
-                        <div className="flex items-center gap-2">
-                          <span className="w-16 text-[10px] font-mono text-slate-400 text-right">Subkon</span>
-                          <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-amber-400 rounded-full transition-all duration-500" 
-                              style={{ width: `${teamW}%` }}
-                            />
-                          </div>
-                          <span className="w-24 text-[10px] font-mono font-bold text-amber-500 dark:text-amber-400 text-right">
-                            {formatRupiah(teamTotal)}
-                          </span>
+                        <div className="text-right">
+                          <span className="text-[9px] text-rose-500 dark:text-rose-400 block">Piutang</span>
+                          <span className="font-bold text-rose-500 dark:text-rose-400">{formatRupiah(rec)}</span>
                         </div>
-
+                        <div className="text-right">
+                          <span className="text-[9px] text-amber-500 dark:text-amber-400 block">Subkon</span>
+                          <span className="font-bold text-amber-500 dark:text-amber-400">{formatRupiah(subkon)}</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400 ml-1 hidden sm:block" />
                       </div>
-
                     </div>
                   );
                 })}
-
-                {/* Tombol Lihat Semua di bawah daftar 3 data */}
-                {projects.length > 3 && (
-                  <div className="pt-2 text-center border-t border-slate-100 dark:border-slate-800">
-                    <button
-                      type="button"
-                      onClick={() => setShowAllChart(!showAllChart)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/50 transition cursor-pointer shadow-2xs active:scale-98"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>
-                        {showAllChart 
-                          ? 'Tampilkan 3 Data Saja (Ringkas)' 
-                          : `Lihat Semua (${projects.length} Proyek)`}
-                      </span>
-                    </button>
-                  </div>
-                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
         </div>
 
         {/* Right Chart (1 Col): Donut Distribution of Workflow Stages */}

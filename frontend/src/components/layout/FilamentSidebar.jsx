@@ -8,8 +8,6 @@ import {
   Sparkles, 
   UserCog, 
   FileText,
-  SlidersHorizontal,
-  Layers,
   Settings
 } from 'lucide-react';
 import { getInitials } from '../../utils/format';
@@ -39,7 +37,6 @@ export default function FilamentSidebar({
   const navGroups = [
     {
       groupTitle: 'MENU OPERASIONAL',
-      icon: SlidersHorizontal,
       items: [
         {
           id: 'dashboard',
@@ -75,7 +72,6 @@ export default function FilamentSidebar({
     },
     {
       groupTitle: 'ADMINISTRASI',
-      icon: Layers,
       items: [
         ...(isAdmin ? [
           {
@@ -180,15 +176,6 @@ export default function FilamentSidebar({
               </div>
             </div>
 
-            {/* Desktop Collapse Button */}
-            <button 
-              onClick={() => setCollapsed(true)}
-              className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-              title="Ciutkan Sidebar"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-            </button>
-
             {/* Mobile Close Button */}
             <button 
               onClick={() => setSidebarOpen(false)}
@@ -203,13 +190,11 @@ export default function FilamentSidebar({
         {/* Navigation Items */}
         <div className={`flex-1 overflow-y-auto ${collapsed ? 'px-2' : 'px-3'} py-3 space-y-4`}>
           {navGroups.map((group, gIdx) => {
-            const GroupIcon = group.icon;
             return (
               <div key={gIdx} className="space-y-1">
                 {!collapsed && (
                   <div className="px-2.5 pb-1 flex items-center justify-between text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                     <span>{group.groupTitle}</span>
-                    {GroupIcon && <GroupIcon className="w-3 h-3 text-slate-300 dark:text-slate-600" />}
                   </div>
                 )}
                 {group.items.map((item) => {
