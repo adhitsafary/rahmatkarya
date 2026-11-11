@@ -2,11 +2,23 @@ import React, { useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { apiLogin } from '../../services/api';
 
-export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMode, showToast }) {
+export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMode, showToast, appSettings }) {
   const [identifier, setIdentifier] = useState('admin');
   const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const companyName = appSettings?.company_name || 'Rahmat-Karya';
+  const companyTagline = appSettings?.company_tagline || 'Sistem Manajemen Arus Kas';
+  const companyLogo = appSettings?.company_logo || '';
+  const companyMonogram = companyName
+    .replace(/^PT\s+/i, '')
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || 'RK';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,26 +33,27 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
     setLoading(false);
   };
 
-  const fillQuick = (u, p) => {
-    setIdentifier(u);
-    setPassword(p);
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-between p-4 sm:p-6 transition-colors selection:bg-slate-900 selection:text-white">
       
       {/* Top Bar with Clean Header & Theme Toggle */}
       <div className="max-w-md w-full mx-auto flex justify-between items-center py-2">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center font-mono font-black text-xs shadow-xs">
-            RK
-          </div>
+          {companyLogo ? (
+            <div className="w-9 h-9 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-xs overflow-hidden p-1">
+              <img src={companyLogo} alt={companyName} className="w-full h-full object-contain" />
+            </div>
+          ) : (
+            <div className="w-9 h-9 rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center font-mono font-black text-xs shadow-xs">
+              {companyMonogram}
+            </div>
+          )}
           <div>
             <div className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">
-              Rahmat-Karya
+              {companyName}
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400">
-              Dompet Digital 2026
+              {companyTagline}
             </div>
           </div>
         </div>
@@ -64,7 +77,7 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
               Otentikasi Keamanan
             </span>
             <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight pt-1">
-              Masuk ke Dompet Digital & Kas
+              Masuk ke Sistem Manajemen Kas
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Sistem Manajemen Arus Kas & Monitoring Piutang Proyek
@@ -118,38 +131,10 @@ export default function FilamentLogin({ onLoginSuccess, isDarkMode, setIsDarkMod
             </button>
           </form>
 
-          {/* Quick Demo Accounts Pill Buttons */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Akses Cepat Demo:
-              </span>
-              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">1-Klik Masuk</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-left">
-              <button
-                type="button"
-                onClick={() => fillQuick('admin', 'admin123')}
-                className="p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 hover:border-slate-400 text-left transition cursor-pointer"
-              >
-                <div className="text-xs font-bold text-slate-900 dark:text-white">Admin</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">admin / admin123</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillQuick('finance', 'password123')}
-                className="p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 hover:border-slate-400 text-left transition cursor-pointer"
-              >
-                <div className="text-xs font-bold text-slate-900 dark:text-white">Finance</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">finance / pass...</div>
-              </button>
-            </div>
-          </div>
-
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          PT Rahmat-Karya &bull; Dompet Digital & Manajemen Kas 2026
+          {companyName.toUpperCase().includes('PT') ? companyName : `PT ${companyName}`}
         </p>
       </div>
 

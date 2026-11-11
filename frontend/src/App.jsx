@@ -584,6 +584,7 @@ export default function App() {
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
           showToast={showToast}
+          appSettings={appSettings}
         />
         <FilamentNotification toast={toast} onClose={() => setToast({ ...toast, show: false })} />
       </>
