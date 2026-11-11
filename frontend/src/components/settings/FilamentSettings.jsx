@@ -21,7 +21,8 @@ import {
   Sliders,
   Check,
   Bell,
-  Clock
+  Clock,
+  Image as ImageIcon
 } from 'lucide-react';
 import { apiGetAppSettings, apiSaveAppSettings, apiTestGeminiKey } from '../../services/api';
 import { getInitials } from '../../utils/format';
@@ -33,6 +34,7 @@ export default function FilamentSettings({ currentUser, showToast, onSettingsUpd
   const [geminiTestResult, setGeminiTestResult] = useState(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const fileInputRef = useRef(null);
+  const bannerInputRef = useRef(null);
 
   // Form State
   const [form, setForm] = useState({
@@ -50,6 +52,9 @@ export default function FilamentSettings({ currentUser, showToast, onSettingsUpd
     notif_auto_briefing: '1',
     notif_upcoming_days: '7',
     notif_desktop_enabled: '1',
+    login_banner_image: '',
+    login_banner_title: '',
+    login_banner_subtitle: '',
     gemini_api_key: '',
     has_gemini_key: false,
     masked_gemini_key: ''
@@ -107,6 +112,30 @@ export default function FilamentSettings({ currentUser, showToast, onSettingsUpd
     if (showToast) showToast('Logo dihapus. Monogram inisial akan digunakan.');
   };
 
+  const handleBannerFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      if (showToast) showToast('Ukuran gambar banner maksimal 5MB.', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result;
+      setForm(prev => ({ ...prev, login_banner_image: base64 }));
+      if (showToast) showToast('Gambar banner berhasil dipilih! Klik Simpan Pengaturan untuk menerapkan.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveBanner = () => {
+    setForm(prev => ({ ...prev, login_banner_image: '' }));
+    if (bannerInputRef.current) bannerInputRef.current.value = '';
+    if (showToast) showToast('Gambar banner dikosongkan. Gambar default akan digunakan.');
+  };
+
   // Test Gemini API Key Connection
   const handleTestGemini = async () => {
     setTestingGemini(true);
@@ -157,7 +186,10 @@ export default function FilamentSettings({ currentUser, showToast, onSettingsUpd
         currency_symbol: form.currency_symbol.trim() || 'Rp',
         notif_auto_briefing: form.notif_auto_briefing === '1' || form.notif_auto_briefing === true ? '1' : '0',
         notif_upcoming_days: String(form.notif_upcoming_days || '7'),
-        notif_desktop_enabled: form.notif_desktop_enabled === '1' || form.notif_desktop_enabled === true ? '1' : '0'
+        notif_desktop_enabled: form.notif_desktop_enabled === '1' || form.notif_desktop_enabled === true ? '1' : '0',
+        login_banner_image: form.login_banner_image || '',
+        login_banner_title: (form.login_banner_title || '').trim(),
+        login_banner_subtitle: (form.login_banner_subtitle || '').trim()
       };
 
       // Only pass gemini_api_key if user typed something
@@ -393,7 +425,123 @@ export default function FilamentSettings({ currentUser, showToast, onSettingsUpd
           </div>
         </div>
 
-        {/* 2. KONTAK & ALAMAT KANTOR */}
+        {/* 2. KUSTOMISASI BANNER HALAMAN LOGIN */}
+        <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-5">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200/70 dark:border-purple-800/70 flex items-center justify-center text-purple-600 dark:text-purple-400">
+              <ImageIcon className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                Kustomisasi Banner & Gambar Halaman Login
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Atur foto proyek/alat berat/arsitektur dan teks sambutan yang tampil di sisi kiri halaman login.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Banner Preview Card */}
+            <div className="lg:col-span-1 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-3">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Pratinjau Banner Login
+              </label>
+
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 aspect-[16/10] flex items-center justify-center group shadow-xs">
+                <img
+                  src={form.login_banner_image || 'https://images.unsplash.com/photo-1541888946425-d0fbb186c5f7?auto=format&fit=crop&w=1200&q=80'}
+                  alt="Pratinjau Banner"
+                  className="w-full h-full object-cover"
+                />
+                {form.login_banner_image && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveBanner}
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-md transition cursor-pointer"
+                    title="Hapus dan kembalikan ke gambar default"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <input
+                  ref={bannerInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleBannerFileChange}
+                  className="hidden"
+                  id="banner-upload-input"
+                />
+                <button
+                  type="button"
+                  onClick={() => bannerInputRef.current?.click()}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition shadow-2xs cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{form.login_banner_image ? 'Ganti Foto Banner' : 'Upload Foto Banner'}</span>
+                </button>
+                <p className="text-[10px] text-slate-400 text-center">
+                  Format: PNG, JPG, WebP (Rasio 16:10 / landscape)
+                </p>
+              </div>
+            </div>
+
+            {/* Banner Text Inputs & URL Option */}
+            <div className="lg:col-span-2 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Judul Sambutan Banner (Kiri)
+                </label>
+                <input
+                  type="text"
+                  value={form.login_banner_title}
+                  onChange={(e) => setForm(prev => ({ ...prev, login_banner_title: e.target.value }))}
+                  placeholder={`Contoh: Selamat Datang di ${form.company_name}`}
+                  className="w-full text-xs rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Kosongkan jika ingin menggunakan judul otomatis: "Selamat Datang di [Nama Perusahaan]".
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Subtitle Sambutan Banner
+                </label>
+                <textarea
+                  rows={2}
+                  value={form.login_banner_subtitle}
+                  onChange={(e) => setForm(prev => ({ ...prev, login_banner_subtitle: e.target.value }))}
+                  placeholder="Contoh: Mengintegrasikan Keamanan dan Efisiensi dalam Setiap Proyek Infrastruktur..."
+                  className="w-full text-xs rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Atau Masukkan URL Gambar Banner Online
+                </label>
+                <input
+                  type="text"
+                  value={form.login_banner_image && form.login_banner_image.startsWith('http') ? form.login_banner_image : ''}
+                  onChange={(e) => setForm(prev => ({ ...prev, login_banner_image: e.target.value }))}
+                  placeholder="https://domain-anda.com/foto-banner-proyek.jpg"
+                  className="w-full text-xs font-mono rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-white"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Dapat berupa tautan link gambar langsung dari website atau cloud storage.
+                </p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* 3. KONTAK & ALAMAT KANTOR */}
         <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/70 dark:border-emerald-800/70 flex items-center justify-center text-emerald-600 dark:text-emerald-400">

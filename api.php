@@ -1671,6 +1671,10 @@ try {
         // 26. App Settings: Get System Settings
         // -------------------------------------------------------------
         case 'get_settings':
+            try {
+                $pdo->exec("ALTER TABLE app_settings MODIFY COLUMN key_value LONGTEXT NULL");
+            } catch (Exception $e) {}
+
             $stmt = $pdo->query("SELECT key_name, key_value FROM app_settings");
             $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
@@ -1689,6 +1693,9 @@ try {
                 'notif_auto_briefing' => $rows['notif_auto_briefing'] ?? '1',
                 'notif_upcoming_days' => $rows['notif_upcoming_days'] ?? '7',
                 'notif_desktop_enabled' => $rows['notif_desktop_enabled'] ?? '1',
+                'login_banner_image' => $rows['login_banner_image'] ?? '',
+                'login_banner_title' => $rows['login_banner_title'] ?? '',
+                'login_banner_subtitle' => $rows['login_banner_subtitle'] ?? '',
             ];
 
             $gemini = new GeminiService($pdo);
@@ -1721,7 +1728,10 @@ try {
                 'currency_symbol',
                 'notif_auto_briefing',
                 'notif_upcoming_days',
-                'notif_desktop_enabled'
+                'notif_desktop_enabled',
+                'login_banner_image',
+                'login_banner_title',
+                'login_banner_subtitle'
             ];
 
             $stmt = $pdo->prepare("INSERT INTO app_settings (key_name, key_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE key_value = VALUES(key_value)");
@@ -1770,6 +1780,9 @@ try {
                 'notif_auto_briefing' => $rows['notif_auto_briefing'] ?? '1',
                 'notif_upcoming_days' => $rows['notif_upcoming_days'] ?? '7',
                 'notif_desktop_enabled' => $rows['notif_desktop_enabled'] ?? '1',
+                'login_banner_image' => $rows['login_banner_image'] ?? '',
+                'login_banner_title' => $rows['login_banner_title'] ?? '',
+                'login_banner_subtitle' => $rows['login_banner_subtitle'] ?? '',
                 'has_gemini_key' => !empty($rawKey),
                 'masked_gemini_key' => $gemini->maskApiKey($rawKey)
             ];
