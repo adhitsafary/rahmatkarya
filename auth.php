@@ -31,7 +31,8 @@ function getCurrentUser(): ?array {
         'name' => $_SESSION['user_name'] ?? 'User',
         'username' => $_SESSION['user_username'] ?? '',
         'email' => $_SESSION['user_email'] ?? '',
-        'role' => $_SESSION['user_role'] ?? 'ADMIN'
+        'role' => $_SESSION['user_role'] ?? 'ADMIN',
+        'client_project_id' => $_SESSION['client_project_id'] ?? null
     ];
 }
 
@@ -164,6 +165,7 @@ function loginUser(string $identifier, string $password, bool $remember = false)
     $_SESSION['user_username'] = $user['username'];
     $_SESSION['user_email'] = $user['email'];
     $_SESSION['user_role'] = $user['role'];
+    $_SESSION['client_project_id'] = !empty($user['client_project_id']) ? (int)$user['client_project_id'] : null;
 
     // Update last login timestamp
     $updateStmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
@@ -176,7 +178,8 @@ function loginUser(string $identifier, string $password, bool $remember = false)
             'name' => $user['name'],
             'username' => $user['username'],
             'email' => $user['email'],
-            'role' => $user['role']
+            'role' => $user['role'],
+            'client_project_id' => $_SESSION['client_project_id']
         ]
     ];
 }

@@ -1,0 +1,183 @@
+/* ==========================================================================
+   LMA-STYLE 1:1 REPLICATION (Clean Floating Card on Mobile & Desktop)
+   ========================================================================== */
+
+/* Fullscreen canvas with soft light blue-gray background */
+.lma-canvas {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem 1rem;
+  background-color: #f3f5f8;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  box-sizing: border-box;
+}
+
+/* Floating White Card */
+.lma-auth-card {
+  width: 100%;
+  max-width: 400px;
+  background-color: #ffffff;
+  border-radius: 28px;
+  box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.05), 0 8px 15px -6px rgba(0, 0, 0, 0.03);
+  padding: 2.25rem 2rem;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+/* Circular Logo Badge with thin indigo ring */
+.lma-circle-logo {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 1.25rem auto;
+  border-radius: 9999px;
+  border: 2px solid #1e3a8a;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  box-sizing: border-box;
+  box-shadow: 0 2px 8px rgba(30, 58, 138, 0.08);
+}
+
+.lma-circle-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 9999px;
+}
+
+.lma-circle-fallback {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #1e3a8a;
+  letter-spacing: -0.02em;
+}
+
+/* Title & Subtitle */
+.lma-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.35rem 0;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.lma-subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 1.75rem 0;
+  font-weight: 400;
+}
+
+/* Form & Inputs */
+.lma-form {
+  text-align: left;
+}
+
+.lma-field {
+  margin-bottom: 1.15rem;
+}
+
+.lma-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.45rem;
+}
+
+.lma-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lma-input {
+  width: 100%;
+  height: 46px;
+  padding: 0 1rem;
+  border-radius: 14px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #111827;
+  font-size: 0.875rem;
+  box-sizing: border-box;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.lma-input:focus {
+  border-color: #5b36f5;
+  box-shadow: 0 0 0 3px rgba(91, 54, 245, 0.15);
+}
+
+.lma-input-pw {
+  padding-right: 3rem;
+}
+
+.lma-eye-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.lma-eye-btn:hover {
+  color: #374151;
+}
+
+/* Primary Action Button (Vibrant Purple Pill) */
+.lma-btn-submit {
+  width: 100%;
+  height: 48px;
+  margin-top: 0.5rem;
+  border-radius: 16px;
+  border: none;
+  background-color: #5b36f5;
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(91, 54, 245, 0.35);
+  transition: all 0.2s ease;
+}
+
+.lma-btn-submit:hover {
+  background-color: #4b25e3;
+  box-shadow: 0 6px 20px rgba(91, 54, 245, 0.45);
+}
+
+.lma-btn-submit:active {
+  transform: scale(0.99);
+}
+
+.lma-btn-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Footer Copyright */
+.lma-footer {
+  margin-top: 2rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}

@@ -1,0 +1,351 @@
+/* ==========================================================================
+   SPLIT 2-COLUMN ARCHITECTURAL LOGIN (World-Class Clean Editorial Aesthetic)
+   ========================================================================== */
+
+/* Fullscreen split container */
+.split-login-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  background-color: #ffffff;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #0f172a;
+}
+
+/* Dark mode override */
+.dark .split-login-container {
+  background-color: #090a0f;
+  color: #f8fafc;
+}
+
+/* Left Hero Column: Architectural Imagery & Editorial Statement */
+.split-hero-side {
+  display: none;
+  width: 50%;
+  position: relative;
+  background-color: #090d16;
+  overflow: hidden;
+  padding: 3.5rem;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+@media (min-width: 1024px) {
+  .split-hero-side {
+    display: flex;
+  }
+}
+
+.split-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.55;
+  filter: contrast(1.05) saturate(1.1);
+  transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.split-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(9, 13, 22, 0.4) 0%, rgba(9, 13, 22, 0.85) 100%);
+}
+
+.split-hero-content {
+  position: relative;
+  z-index: 10;
+  color: #ffffff;
+  max-width: 540px;
+}
+
+.split-hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.split-hero-quote {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+  margin-top: 1.5rem;
+}
+
+.split-hero-sub {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 0.75rem;
+  font-weight: 400;
+}
+
+.split-hero-footer {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 1.5rem;
+}
+
+/* Right Form Side: Pure Minimalist Precision */
+.split-form-side {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  background-color: #ffffff;
+  position: relative;
+}
+
+.dark .split-form-side {
+  background-color: #0b0f19;
+}
+
+@media (min-width: 1024px) {
+  .split-form-side {
+    width: 50%;
+    padding: 4rem 3.5rem;
+  }
+}
+
+.split-form-card {
+  width: 100%;
+  max-width: 400px;
+  box-sizing: border-box;
+}
+
+/* Clean Top Navigation Bar */
+.split-top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2.25rem;
+}
+
+/* 2D Architectural Minimalist Monogram */
+.arch-monogram-2d {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background-color: #0f172a;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+}
+
+.dark .arch-monogram-2d {
+  background-color: #f8fafc;
+  color: #0f172a;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.split-theme-btn {
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dark .split-theme-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+.split-theme-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.dark .split-theme-btn:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+/* Headings */
+.split-form-header {
+  margin-bottom: 2rem;
+}
+
+.split-form-title {
+  font-size: 1.625rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+  margin: 0 0 0.4rem 0;
+  line-height: 1.2;
+}
+
+.dark .split-form-title {
+  color: #f8fafc;
+}
+
+.split-form-desc {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.dark .split-form-desc {
+  color: #94a3b8;
+}
+
+/* Form Fields */
+.split-field-group {
+  margin-bottom: 1.25rem;
+}
+
+.split-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+}
+
+.split-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #334155;
+  letter-spacing: -0.01em;
+}
+
+.dark .split-field-label {
+  color: #cbd5e1;
+}
+
+.split-toggle-visibility {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6366f1;
+  cursor: pointer;
+}
+
+.split-toggle-visibility:hover {
+  text-decoration: underline;
+}
+
+.split-text-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 1rem;
+  border-radius: 10px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  font-size: 0.875rem;
+  box-sizing: border-box;
+  outline: none;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.dark .split-text-input {
+  background-color: #111827;
+  border-color: #1f2937;
+  color: #f9fafb;
+}
+
+.split-text-input:focus {
+  background-color: #ffffff;
+  border-color: #0f172a;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+}
+
+.dark .split-text-input:focus {
+  background-color: #0f172a;
+  border-color: #f8fafc;
+  box-shadow: 0 0 0 3px rgba(248, 250, 252, 0.12);
+}
+
+/* Primary Action Button */
+.split-submit-btn {
+  width: 100%;
+  height: 46px;
+  margin-top: 0.75rem;
+  border-radius: 10px;
+  border: none;
+  background-color: #0f172a;
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+}
+
+.dark .split-submit-btn {
+  background-color: #f8fafc;
+  color: #0f172a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.split-submit-btn:hover {
+  background-color: #1e293b;
+  transform: translateY(-0.5px);
+}
+
+.dark .split-submit-btn:hover {
+  background-color: #ffffff;
+  color: #020617;
+}
+
+.split-submit-btn:active {
+  transform: scale(0.99);
+}
+
+.split-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Bottom Trust & Copyright */
+.split-form-footer {
+  margin-top: 2.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #f1f5f9;
+  text-align: center;
+}
+
+.dark .split-form-footer {
+  border-color: #1e293b;
+}
+
+.split-copyright-text {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: 0;
+}

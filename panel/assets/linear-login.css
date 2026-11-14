@@ -1,0 +1,244 @@
+/* ==========================================================================
+   LINEAR / STRIPE TIER ENTERPRISE LOGIN PORTAL (World-Class Clean Aesthetic)
+   ========================================================================== */
+
+/* Fullscreen Deep Minimalist Canvas */
+.linear-login-canvas {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  background-color: #08090a;
+  color: #f7f8f8;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "cv01", "ss03";
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle architectural gradient spotlight */
+.linear-login-canvas::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 800px;
+  height: 420px;
+  background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(94, 106, 210, 0.14), transparent 75%);
+  pointer-events-none;
+}
+
+/* Linear-style Seamless Floating Container */
+.linear-login-card {
+  width: 100%;
+  max-width: 380px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 24px 48px -12px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  padding: 2.25rem 2rem;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 10;
+}
+
+/* Top Bar: Brand Monogram & Theme */
+.linear-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+/* Architectural Minimalist Monogram: Pure 2D Geometric Mark */
+.linear-brand-monogram {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #1f2228 0%, #121316 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f7f8f8;
+  font-weight: 700;
+  font-size: 0.875rem;
+  letter-spacing: -0.02em;
+}
+
+.linear-brand-tag {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8a8f98;
+}
+
+.linear-theme-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.6875rem;
+  color: #8a8f98;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.linear-theme-btn:hover {
+  color: #f7f8f8;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Typographic Anchor */
+.linear-title-block {
+  margin-bottom: 1.75rem;
+}
+
+.linear-headline {
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: #f7f8f8;
+  margin: 0 0 0.35rem 0;
+  line-height: 1.25;
+}
+
+.linear-subheadline {
+  font-size: 0.8125rem;
+  color: #8a8f98;
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* Linear-style Form Inputs */
+.linear-field {
+  margin-bottom: 1.25rem;
+}
+
+.linear-label-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.linear-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #d0d6e0;
+}
+
+.linear-label-action {
+  font-size: 0.6875rem;
+  color: #7170ff;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.linear-label-action:hover {
+  color: #828fff;
+}
+
+.linear-input-wrap {
+  position: relative;
+}
+
+.linear-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 0.875rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f7f8f8;
+  font-size: 0.875rem;
+  box-sizing: border-box;
+  outline: none;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+}
+
+.linear-input::placeholder {
+  color: #62666d;
+}
+
+.linear-input:focus {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(113, 112, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(113, 112, 255, 0.18);
+}
+
+/* Primary Linear Indigo CTA */
+.linear-submit-btn {
+  width: 100%;
+  height: 42px;
+  margin-top: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #5e6ad2;
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 4px 12px rgba(94, 106, 210, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.linear-submit-btn:hover {
+  background: #6a76e0;
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.25),
+    0 6px 18px rgba(94, 106, 210, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transform: translateY(-0.5px);
+}
+
+.linear-submit-btn:active {
+  transform: scale(0.99);
+  background: #535fc4;
+}
+
+.linear-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Clean Corporate Footer */
+.linear-footer {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+}
+
+.linear-trust-line {
+  font-size: 0.6875rem;
+  color: #62666d;
+  line-height: 1.5;
+}

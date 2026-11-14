@@ -12,7 +12,7 @@ require_once __DIR__ . '/notification_service.php';
 
 $action = $_GET['action'] ?? '';
 $clientToken = $_GET['token'] ?? ($_POST['token'] ?? '');
-$isClientAction = in_array($action, ['client_portal_data', 'client_add_revision', 'client_approve_deal', 'client_get_projects', 'get_settings']);
+$isClientAction = in_array($action, ['client_portal_data', 'client_add_revision', 'client_approve_deal', 'client_get_projects', 'verify_client_access', 'get_settings']);
 
 // Protect API calls: Ensure user has valid active session or accessing client portal
 if (!$isClientAction) {
@@ -138,6 +138,7 @@ function syncFaviconsFromLogo($companyLogo) {
         return false;
     }
 }
+
 
 try {
     switch ($action) {
@@ -908,6 +909,17 @@ try {
             $token = trim($_GET['token'] ?? ($_POST['token'] ?? ''));
             $id = (int)($_GET['id'] ?? ($_POST['id'] ?? 0));
 
+            // Security: If logged in as CLIENT, restrict strictly to their assigned project!
+            $currentUser = getCurrentUser();
+            if ($currentUser && $currentUser['role'] === 'CLIENT') {
+                $assignedId = (int)($currentUser['client_project_id'] ?? 0);
+                if ($assignedId <= 0) {
+                    sendResponse(false, null, 'Akun klien Anda belum dihubungkan ke proyek manapun. Hubungi administrator.', 403);
+                }
+                $id = $assignedId;
+                $token = ''; // Override any token tampering
+            }
+
             $project = null;
             if (!empty($token)) {
                 $stmt = $pdo->prepare("SELECT * FROM v_project_financial_summary WHERE client_access_token = ?");
@@ -925,6 +937,11 @@ try {
 
             if (!$project) {
                 sendResponse(false, null, 'Proyek klien tidak ditemukan atau tautan akses tidak valid.', 404);
+            }
+
+            // Security: Ensure CLIENT cannot inspect other project data
+            if ($currentUser && $currentUser['role'] === 'CLIENT' && (int)$project['project_id'] !== (int)$currentUser['client_project_id']) {
+                sendResponse(false, null, 'Akses ditolak. Anda hanya diizinkan mengakses proyek yang ditugaskan kepada Anda.', 403);
             }
 
             $projectId = (int)$project['project_id'];
@@ -945,11 +962,10 @@ try {
             $clientPayments = $stmtCp->fetchAll();
 
             // Prepare pre-composed message templates for WA and Email
-            $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? 80) == 443) ? 'https' : 'http';
             $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            $scriptDir = trim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
-            $dirPrefix = (!empty($scriptDir) && $scriptDir !== '.') ? "/{$scriptDir}" : '';
-            $portalUrl = "{$proto}://{$host}{$dirPrefix}/client.php?token={$project['client_access_token']}";
+            $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['SERVER_PORT'] ?? 80) == 443 || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+            $scheme = $isHttps ? 'https' : 'http';
+            $portalUrl = "{$scheme}://{$host}/client.php?token={$project['client_access_token']}";
 
             $waText = "Halo Bpk/Ibu *{$project['client_name']}*,\n\n"
                     . "Berikut ringkasan update proyek Anda di Rahmat-Karya:\n"
@@ -997,6 +1013,19 @@ try {
         // 4m. Client Portal: Get Available Projects for Client Selector
         // -------------------------------------------------------------
         case 'client_get_projects':
+            $currentUser = getCurrentUser();
+            if ($currentUser && $currentUser['role'] === 'CLIENT') {
+                $assignedId = (int)($currentUser['client_project_id'] ?? 0);
+                if ($assignedId > 0) {
+                    $stmt = $pdo->prepare("SELECT id, project_code, contract_number, project_name, client_name, client_access_token, workflow_step, progress_percent FROM projects WHERE id = ?");
+                    $stmt->execute([$assignedId]);
+                    $list = $stmt->fetchAll();
+                    sendResponse(true, $list);
+                } else {
+                    sendResponse(true, []);
+                }
+                break;
+            }
             $stmt = $pdo->query("SELECT id, project_code, contract_number, project_name, client_name, client_access_token, workflow_step, progress_percent FROM projects WHERE status != 'ARCHIVED' ORDER BY id ASC");
             $list = $stmt->fetchAll();
             sendResponse(true, $list);
@@ -1052,28 +1081,7 @@ try {
             ");
             $stmt->execute([$projectId, $invNumber, $paymentType, $amountPaid, $paymentDate, $paymentMethod, $notes]);
 
-            // Cek apakah pembayaran klien sudah lunas 100% dari total kontrak
-            $stmtTotalPaid = $pdo->prepare("SELECT COALESCE(SUM(amount_paid), 0) FROM client_payments WHERE project_id = ?");
-            $stmtTotalPaid->execute([$projectId]);
-            $currentTotalPaid = (float)$stmtTotalPaid->fetchColumn();
-
-            $stmtContract = $pdo->prepare("SELECT total_contract_value FROM projects WHERE id = ?");
-            $stmtContract->execute([$projectId]);
-            $contractVal = (float)$stmtContract->fetchColumn();
-
-            $isNowFullyPaid = false;
-            if ($contractVal > 0 && $currentTotalPaid >= $contractVal) {
-                // Otomatis ubah tahapan workflow menjadi DONE dan status COMPLETED jika sudah lunas
-                $stmtDone = $pdo->prepare("UPDATE projects SET workflow_step = 'DONE', status = 'COMPLETED', progress_percent = 100 WHERE id = ?");
-                $stmtDone->execute([$projectId]);
-                $isNowFullyPaid = true;
-            }
-
-            $successMsg = $isNowFullyPaid 
-                ? 'Pembayaran pelunasan berhasil dicatat & proyek otomatis berstatus Selesai (Deal)!' 
-                : 'Pembayaran klien berhasil dicatat!';
-
-            sendResponse(true, ['payment_id' => $pdo->lastInsertId(), 'is_fully_paid' => $isNowFullyPaid], $successMsg);
+            sendResponse(true, ['payment_id' => $pdo->lastInsertId()], 'Pembayaran klien berhasil dicatat!');
             break;
 
         // -------------------------------------------------------------
@@ -1194,7 +1202,33 @@ try {
             break;
 
         // -------------------------------------------------------------
-        // 10. Delete Project
+        // Verify Client Access Token / Code
+        // -------------------------------------------------------------
+        case 'verify_client_access':
+            $token = trim($_GET['token'] ?? ($_POST['token'] ?? ''));
+            if (empty($token)) {
+                sendResponse(false, null, 'Kode akses / token proyek wajib diisi.', 422);
+            }
+            $stmt = $pdo->prepare("SELECT id, project_code, project_name, client_name, client_access_token FROM projects WHERE client_access_token = ? OR project_code = ? LIMIT 1");
+            $stmt->execute([$token, $token]);
+            $proj = $stmt->fetch();
+            $portalToken = !empty($proj['client_access_token']) ? "token=" . urlencode($proj['client_access_token']) : "id=" . (int)$proj['id'];
+            if ($proj) {
+                sendResponse(true, [
+                    'project_id' => (int)$proj['id'],
+                    'project_code' => $proj['project_code'],
+                    'project_name' => $proj['project_name'],
+                    'client_name' => $proj['client_name'],
+                    'client_access_token' => $proj['client_access_token'],
+                    'portal_url' => "client.php?{$portalToken}"
+                ], 'Akses proyek valid!');
+            } else {
+                sendResponse(false, null, 'Kode akses / token tidak valid atau proyek tidak ditemukan.', 404);
+            }
+            break;
+
+        // -------------------------------------------------------------
+        // 1. Projects: Get All
         // -------------------------------------------------------------
         case 'delete_project':
             requireCanEdit(true);
@@ -1253,7 +1287,7 @@ try {
         // -------------------------------------------------------------
         case 'get_users':
             requireAdmin(true);
-            $stmt = $pdo->query("SELECT id, name, username, email, role, avatar, last_login, created_at, updated_at FROM users ORDER BY id ASC");
+            $stmt = $pdo->query("SELECT u.id, u.name, u.username, u.email, u.role, u.client_project_id, u.avatar, u.last_login, u.created_at, u.updated_at, p.project_name, p.project_code FROM users u LEFT JOIN projects p ON u.client_project_id = p.id ORDER BY u.id ASC");
             $users = $stmt->fetchAll();
             sendResponse(true, $users, 'Daftar pengguna berhasil dimuat.');
             break;
@@ -1271,6 +1305,7 @@ try {
             $email = trim($data['email'] ?? '');
             $password = trim($data['password'] ?? '');
             $role = strtoupper(trim($data['role'] ?? 'VIEWER'));
+            $clientProjectId = !empty($data['client_project_id']) ? (int)$data['client_project_id'] : null;
 
             if (empty($name) || empty($username) || empty($email) || empty($password)) {
                 sendResponse(false, null, 'Nama, username, email, dan kata sandi wajib diisi.', 422);
@@ -1284,8 +1319,12 @@ try {
                 sendResponse(false, null, 'Kata sandi minimal 6 karakter.', 422);
             }
 
-            if (!in_array($role, ['ADMIN', 'FINANCE', 'VIEWER'])) {
+            if (!in_array($role, ['ADMIN', 'FINANCE', 'VIEWER', 'CLIENT'])) {
                 $role = 'VIEWER';
+            }
+
+            if ($role === 'CLIENT' && empty($clientProjectId)) {
+                sendResponse(false, null, 'Untuk akun Client, wajib memilih Proyek yang ditugaskan.', 422);
             }
 
             // Check duplicate username or email
@@ -1301,8 +1340,8 @@ try {
             }
 
             $hashed = password_hash($password, PASSWORD_BCRYPT);
-            $stmt = $pdo->prepare("INSERT INTO users (name, username, email, password, role) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $username, $email, $hashed, $role]);
+            $stmt = $pdo->prepare("INSERT INTO users (name, username, email, password, role, client_project_id) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $username, $email, $hashed, $role, $clientProjectId]);
             $newId = (int)$pdo->lastInsertId();
 
             sendResponse(true, ['user_id' => $newId], 'Pengguna baru berhasil ditambahkan!');
@@ -1322,6 +1361,7 @@ try {
             $email = trim($data['email'] ?? '');
             $password = trim($data['password'] ?? '');
             $role = strtoupper(trim($data['role'] ?? 'VIEWER'));
+            $clientProjectId = !empty($data['client_project_id']) ? (int)$data['client_project_id'] : null;
 
             if ($id <= 0 || empty($name) || empty($username) || empty($email)) {
                 sendResponse(false, null, 'Data tidak lengkap.', 422);
@@ -1331,8 +1371,12 @@ try {
                 sendResponse(false, null, 'Format email tidak valid.', 422);
             }
 
-            if (!in_array($role, ['ADMIN', 'FINANCE', 'VIEWER'])) {
+            if (!in_array($role, ['ADMIN', 'FINANCE', 'VIEWER', 'CLIENT'])) {
                 $role = 'VIEWER';
+            }
+
+            if ($role === 'CLIENT' && empty($clientProjectId)) {
+                sendResponse(false, null, 'Untuk akun Client, wajib memilih Proyek yang ditugaskan.', 422);
             }
 
             // Check if user exists
@@ -1369,11 +1413,11 @@ try {
                     sendResponse(false, null, 'Kata sandi minimal 6 karakter.', 422);
                 }
                 $hashed = password_hash($password, PASSWORD_BCRYPT);
-                $stmt = $pdo->prepare("UPDATE users SET name = ?, username = ?, email = ?, password = ?, role = ? WHERE id = ?");
-                $stmt->execute([$name, $username, $email, $hashed, $role, $id]);
+                $stmt = $pdo->prepare("UPDATE users SET name = ?, username = ?, email = ?, password = ?, role = ?, client_project_id = ? WHERE id = ?");
+                $stmt->execute([$name, $username, $email, $hashed, $role, $clientProjectId, $id]);
             } else {
-                $stmt = $pdo->prepare("UPDATE users SET name = ?, username = ?, email = ?, role = ? WHERE id = ?");
-                $stmt->execute([$name, $username, $email, $role, $id]);
+                $stmt = $pdo->prepare("UPDATE users SET name = ?, username = ?, email = ?, role = ?, client_project_id = ? WHERE id = ?");
+                $stmt->execute([$name, $username, $email, $role, $clientProjectId, $id]);
             }
 
             // If updating current user's own profile, update session
@@ -1667,7 +1711,8 @@ try {
             }
             break;
 
-        // -------------------------------------------------------------
+
+// -------------------------------------------------------------
         // 26. App Settings: Get System Settings
         // -------------------------------------------------------------
         case 'get_settings':
@@ -1834,5 +1879,5 @@ try {
     }
     sendResponse(false, null, 'Kesalahan Database: ' . $msg, 400);
 } catch (Exception $e) {
-    sendResponse(false, null, 'Kesalahan Sistem: ' . $e->getMessage(), 500);
+    sendResponse(false, null, 'Server Error: ' . $e->getMessage(), 500);
 }

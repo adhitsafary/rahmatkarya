@@ -19,6 +19,7 @@ test_my_pwd.php
 .env
 .env.*
 !.env.example
+_backup*/
 
 # OS / Editor
 *.zip

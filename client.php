@@ -15,6 +15,23 @@ require_once __DIR__ . '/auth.php';
 $token = trim($_GET['token'] ?? '');
 $projectId = (int)($_GET['id'] ?? 0);
 $currentUser = getCurrentUser();
+
+// Security Guard:
+// 1. If user is logged in as CLIENT, lock strictly to their assigned project!
+if ($currentUser && $currentUser['role'] === 'CLIENT') {
+    $assignedProject = (int)($currentUser['client_project_id'] ?? 0);
+    if ($assignedProject <= 0) {
+        die("<html><body style='font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#f8fafc;margin:0;'><div style='background:white;padding:30px;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.05);text-align:center;'><h2>Akses Ditangguhkan</h2><p style='color:#64748b;'>Akun Client Anda belum dihubungkan ke proyek manapun. Hubungi administrator.</p><a href='logout.php' style='color:#4f46e5;text-decoration:none;font-weight:bold;'>Keluar</a></div></body></html>");
+    }
+    // Override any ID or Token in URL
+    $projectId = $assignedProject;
+    $token = '';
+}
+// 2. If accessing client.php without a token and not logged in as Admin/Finance/Client, redirect to login
+if (empty($token) && !$currentUser) {
+    header("Location: login.php?redirect=" . urlencode($_SERVER['REQUEST_URI'] ?? 'client.php'));
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="id" x-data="procashClientPortal()" :class="{ 'dark': isDarkMode }" x-init="initPortal()">
@@ -22,11 +39,6 @@ $currentUser = getCurrentUser();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dashboard Klien - Rahmat-Karya</title>
-    <!-- Favicon & Brand Icons -->
-    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png?v=4">
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=4">
-    <link rel="shortcut icon" href="./favicon.ico?v=4">
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=4">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -258,39 +270,51 @@ $currentUser = getCurrentUser();
                 <!-- Right: Project Switcher & Direct Admin Link -->
                 <div class="flex items-center gap-2 sm:gap-3">
                     
-                    <!-- Project Selector Dropdown -->
-                    <div class="relative" x-data="{ open: false }">
-                        <button @click="open = !open" 
-                                class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-slate-400 transition">
-                            <span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                            <span class="max-w-[120px] sm:max-w-[180px] truncate" x-text="project ? project.project_name : 'Pilih Proyek...'"></span>
-                            <span class="text-[9px] text-slate-400">▼</span>
-                        </button>
-                        <div x-cloak x-show="open" @click.away="open = false" 
-                             class="absolute right-0 mt-2 w-64 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 text-xs">
-                            <div class="px-3 py-1.5 text-[10px] font-bold uppercase text-slate-400">Pilih Proyek:</div>
-                            <template x-for="p in projectList" :key="p.id">
-                                <button @click="switchProject(p.id, p.client_access_token); open = false;"
-                                        class="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between"
-                                        :class="project && project.project_id == p.id ? 'bg-slate-100 dark:bg-slate-800 font-bold text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300 font-medium'">
-                                    <div class="truncate">
-                                        <div x-text="p.project_name" class="font-bold truncate"></div>
-                                        <div class="text-[10px] text-slate-400 font-mono" x-text="p.contract_number || p.project_code"></div>
-                                    </div>
-                                    <span class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
-                                          :class="p.workflow_step === 'DONE' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'"
-                                          x-text="p.workflow_step"></span>
-                                </button>
-                            </template>
+                    <!-- Project Selector Dropdown (Hidden for CLIENT role to prevent project hopping) -->
+                    <template x-if="userRole !== 'CLIENT'">
+                        <div class="relative" x-data="{ open: false }">
+                            <button @click="open = !open" 
+                                    class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-slate-400 transition">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                                <span class="max-w-[120px] sm:max-w-[180px] truncate" x-text="project ? project.project_name : 'Pilih Proyek...'"></span>
+                                <span class="text-[9px] text-slate-400">▼</span>
+                            </button>
+                            <div x-cloak x-show="open" @click.away="open = false" 
+                                 class="absolute right-0 mt-2 w-64 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 text-xs">
+                                <div class="px-3 py-1.5 text-[10px] font-bold uppercase text-slate-400">Pilih Proyek:</div>
+                                <template x-for="p in projectList" :key="p.id">
+                                    <button @click="switchProject(p.id, p.client_access_token); open = false;"
+                                            class="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between"
+                                            :class="project && project.project_id == p.id ? 'bg-slate-100 dark:bg-slate-800 font-bold text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300 font-medium'">
+                                        <div class="truncate">
+                                            <div x-text="p.project_name" class="font-bold truncate"></div>
+                                            <div class="text-[10px] text-slate-400 font-mono" x-text="p.contract_number || p.project_code"></div>
+                                        </div>
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
+                                              :class="p.workflow_step === 'DONE' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'"
+                                              x-text="p.workflow_step"></span>
+                                    </button>
+                                </template>
+                            </div>
                         </div>
-                    </div>
+                    </template>
 
-                    <!-- Link to Admin Panel -->
-                    <a href="index.html" 
-                       class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 transition">
-                        <span>Panel Admin</span>
-                        <span>&rarr;</span>
-                    </a>
+                    <!-- Link to Admin Panel (Hidden for CLIENT role) -->
+                    <template x-if="userRole !== 'CLIENT'">
+                        <a href="index.html" 
+                           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 transition">
+                            <span>Panel Admin</span>
+                            <span>&rarr;</span>
+                        </a>
+                    </template>
+                    
+                    <!-- Logout button for CLIENT -->
+                    <template x-if="userRole === 'CLIENT'">
+                        <a href="logout.php" 
+                           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition">
+                            <span>Keluar</span>
+                        </a>
+                    </template>
                 </div>
 
             </header>
@@ -471,50 +495,15 @@ $currentUser = getCurrentUser();
                             <!-- CARD: PROGRES PENGERJAAN & PEMBAYARAN -->
                             <div id="section-progres" class="rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm">
                                 <div class="flex items-center justify-between border-b pb-3 mb-4 border-slate-100 dark:border-slate-800">
-                                    <h3 class="text-sm font-bold text-slate-900 dark:text-white">Progres Fisik & Visual Arus Kas</h3>
+                                    <h3 class="text-sm font-bold text-slate-900 dark:text-white">Progres Fisik & Arus Pembayaran</h3>
                                     <span class="text-xs font-mono font-bold text-blue-600" x-text="project.progress_percent + '% Fisik'"></span>
-                                </div>
-
-                                <!-- Visual Realization Chart Hub -->
-                                <div class="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 mb-4">
-                                    <!-- SVG Circular Donut Chart for Payment Realization -->
-                                    <div class="relative w-24 h-24 shrink-0 flex items-center justify-center">
-                                        <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                                            <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="currentColor" stroke-width="3.2" class="text-slate-200 dark:text-slate-700"></circle>
-                                            <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#10B981" stroke-width="3.4"
-                                                    :stroke-dasharray="`${project.client_payment_progress_percent || 0} ${100 - (project.client_payment_progress_percent || 0)}`"
-                                                    stroke-dashoffset="0"
-                                                    stroke-linecap="round"
-                                                    class="transition-all duration-700"></circle>
-                                        </svg>
-                                        <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                            <span class="text-base font-black font-mono text-slate-900 dark:text-white" x-text="(project.client_payment_progress_percent || 0) + '%'"></span>
-                                            <span class="text-[8px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Terbayar</span>
-                                        </div>
-                                    </div>
-
-                                    <!-- Quick Breakdown Rows -->
-                                    <div class="flex-1 min-w-0 space-y-1.5 text-xs w-full">
-                                        <div class="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                                            <span>Kas Masuk (DP & Termin):</span>
-                                            <strong class="font-mono text-emerald-600 dark:text-emerald-400 font-bold" x-text="formatRupiah(project.total_paid_by_client)"></strong>
-                                        </div>
-                                        <div class="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                                            <span>Sisa Tagihan Pelunasan:</span>
-                                            <strong class="font-mono font-bold" :class="project.client_receivable_remaining > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'" x-text="project.client_receivable_remaining > 0 ? formatRupiah(project.client_receivable_remaining) : 'Rp 0 (LUNAS)'"></strong>
-                                        </div>
-                                        <div class="flex justify-between items-center pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 text-slate-500 text-[11px]">
-                                            <span>Target Penyelesaian:</span>
-                                            <span class="font-mono font-semibold text-slate-800 dark:text-slate-200" x-text="formatDate(project.deadline_date) + (project.days_left_to_deadline > 0 ? ' (' + project.days_left_to_deadline + ' hari lagi)' : '')"></span>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 <div class="space-y-4">
                                     <!-- Fisik Progress -->
                                     <div>
                                         <div class="flex justify-between text-xs font-medium mb-1 text-slate-600 dark:text-slate-300">
-                                            <span>Pengerjaan Desain & Gambar Kerja</span>
+                                            <span>Pengerjaan Sistem</span>
                                             <span class="font-mono font-bold" x-text="project.progress_percent + '%'"></span>
                                         </div>
                                         <div class="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
@@ -696,7 +685,7 @@ $currentUser = getCurrentUser();
             <form @submit.prevent="submitClientRevision()" class="space-y-4 text-xs">
                 <div>
                     <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Judul Bagian Revisi *</label>
-                    <input type="text" x-model="formRev.title" required placeholder="Contoh: Penyesuaian Fasad Depan, Tampak & Denah Ruang" 
+                    <input type="text" x-model="formRev.title" required placeholder="Contoh: Penyesuaian Tampilan Navbar & Logo" 
                            class="w-full text-xs font-semibold border rounded-xl px-3.5 py-2.5 bg-slate-50 border-slate-200 text-slate-900 dark:bg-slate-950 dark:border-slate-800 dark:text-white focus:outline-none">
                 </div>
 
@@ -755,6 +744,8 @@ $currentUser = getCurrentUser();
                 isDarkMode: false,
                 sidebarOpen: false,
                 loading: true,
+                userRole: '<?= $currentUser['role'] ?? 'VIEWER' ?>',
+                assignedProjectId: <?= (int)($currentUser['client_project_id'] ?? 0) ?>,
                 project: null,
                 paymentTerms: [],
                 revisions: [],
@@ -829,8 +820,14 @@ $currentUser = getCurrentUser();
                     this.loading = true;
                     try {
                         const urlParams = new URLSearchParams(window.location.search);
-                        const id = projId || urlParams.get('id') || '1';
-                        const token = tokenStr || urlParams.get('token') || '';
+                        let id = projId || urlParams.get('id') || '1';
+                        let token = tokenStr || urlParams.get('token') || '';
+
+                        // Strictly lock to assigned project if user is CLIENT
+                        if (this.userRole === 'CLIENT' && this.assignedProjectId > 0) {
+                            id = this.assignedProjectId;
+                            token = '';
+                        }
 
                         let endpoint = 'api.php?action=client_portal_data';
                         if (token) endpoint += '&token=' + encodeURIComponent(token);
@@ -855,7 +852,7 @@ $currentUser = getCurrentUser();
                             this.showToast(json.message || 'Gagal memuat proyek.', true);
                         }
                     } catch (e) {
-                        this.showToast('Gagal terhubung ke portal klien.', true);
+                        this.showToast('Gagal terhubung ke server portal klien.', true);
                     } finally {
                         this.loading = false;
                     }
@@ -887,7 +884,7 @@ $currentUser = getCurrentUser();
                 getWorkflowLabel(step) {
                     switch (step) {
                         case 'KONTRAK_DP': return 'Kontrak & DP Awal';
-                        case 'PENGERJAAN': return 'Pengerjaan Desain';
+                        case 'PENGERJAAN': return 'Pengerjaan Sistem';
                         case 'REVISI': return 'Tahap Revisi';
                         case 'PEMBAYARAN_AKHIR': return 'Pembayaran Akhir';
                         case 'DONE': return 'Proyek Selesai';

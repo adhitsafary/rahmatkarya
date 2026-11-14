@@ -1,0 +1,111 @@
+/* ==========================================================================
+   ENHANCED SKELETON SHIMMER & BUTTON CLICK ANIMATIONS
+   ========================================================================== */
+
+/* 1. Global Tactile Button & Link Active Ripple */
+button,
+.btn-purple-login,
+.lma-unified-btn,
+.lma-btn-submit,
+a[role="button"],
+input[type="button"],
+input[type="submit"] {
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1),
+              box-shadow 0.15s ease,
+              background-color 0.15s ease,
+              filter 0.15s ease !important;
+}
+
+/* Tactile bouncy spring press */
+button:active,
+.btn-purple-login:active,
+.lma-unified-btn:active,
+.lma-btn-submit:active,
+a[role="button"]:active {
+  transform: scale(0.96) translateY(1px) !important;
+  filter: brightness(0.95);
+}
+
+/* Subtle light ripple on click */
+button::after,
+.btn-purple-login::after,
+.lma-unified-btn::after,
+.lma-btn-submit::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140%;
+  padding-bottom: 140%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 70%);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+button:active::after,
+.btn-purple-login:active::after,
+.lma-unified-btn:active::after,
+.lma-btn-submit:active::after {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  transition: transform 0s, opacity 0.25s ease-out;
+}
+
+/* 2. Pure Skeleton Shimmer Animation */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer,
+.skeleton-box {
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 0%,
+    #e2e8f0 35%,
+    #ffffff 50%,
+    #e2e8f0 65%,
+    #f1f5f9 100%
+  ) !important;
+  background-size: 250% 100% !important;
+  animation: skeleton-shimmer 1.5s infinite linear !important;
+  border-radius: 10px;
+}
+
+.dark .skeleton-shimmer,
+.dark .skeleton-box {
+  background: linear-gradient(
+    90deg,
+    #0f172a 0%,
+    #1e293b 35%,
+    #334155 50%,
+    #1e293b 65%,
+    #0f172a 100%
+  ) !important;
+  background-size: 250% 100% !important;
+  animation: skeleton-shimmer 1.5s infinite linear !important;
+}
+
+/* Skeleton Loading Container Card */
+.skeleton-card {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.dark .skeleton-card {
+  border-color: #1e293b;
+  background-color: #0f172a;
+}
